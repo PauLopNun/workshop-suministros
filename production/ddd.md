@@ -13,13 +13,13 @@ classDiagram
         +FactoryId id
         +String name
         +Location location
-        +String warehouseId
-        +List~String~ assignedRecipes
+        +WarehouseId warehouseId
+        +List~RecipeId~ assignedRecipes
         +canProduce(recipeId) boolean
     }
     class FactoryId {
         <<value object>>
-        +String value
+        +String id
     }
     class Location {
         <<value object>>
@@ -37,9 +37,9 @@ classDiagram
     class ProductionOrder {
         <<aggregate root>>
         +OrderId id
-        +String factoryId
-        +String recipeId
-        +String storeOrderId
+        +FactoryId factoryId
+        +RecipeId recipeId
+        +WarehouseOrderId warehouseOrderId
         +OrderStatus status
         +int remainingDays
         +List~OrderLine~ lines
@@ -47,9 +47,13 @@ classDiagram
         +isCompleted() boolean
         +start()
     }
+    class OrderId {
+        <<value object>>
+        +String id
+    }
     class OrderLine {
         <<entity>>
-        +String productId
+        +ProductId productId
         +int quantity
         +boolean consumed
     }
@@ -62,11 +66,12 @@ classDiagram
     }
     class OrderId {
         <<value object>>
-        +String value
+        +String id
     }
     ProductionOrder --> OrderId
     ProductionOrder --> OrderStatus
     ProductionOrder "1" --> "*" OrderLine
+    ProductionOrder --> OrderId
 ```
 
 ### Module: recipe
@@ -77,52 +82,77 @@ classDiagram
         <<aggregate root>>
         +RecipeId id
         +String name
-        +List~Ingredient~ inputs
-        +String outputProductId
+        +List~RecipeIngredient~ inputs
+        +ProductId outputProductId
         +int buildTimeInDays
     }
-    class Ingredient {
+    class RecipeIngredient {
         <<value object>>
-        +String productId
+        +IngredientId ingredientId
         +int quantity
+    }
+    class Ingredient {
+        <<aggregate root>>
+        +IngredientId id
+        +String name
+    }
+    class IngredientId {
+        <<value object>>
+        +String id
     }
     class RecipeId {
         <<value object>>
-        +String value
+        +String id
     }
     Recipe --> RecipeId
-    Recipe "1" --> "*" Ingredient
+    Recipe "1" --> "*" RecipeIngredient : contains
+    RecipeIngredient --> IngredientId
+    Ingredient --> IngredientId
 ```
 
-### Module: store-order
+### Module: warehouse-order
 
 ```mermaid
 classDiagram
-    class StoreOrder {
+    class WarehouseOrder {
         <<aggregate root>>
-        +StoreOrderId id
-        +String storeId
-        +String productId
+        +WarehouseOrderId id
+        +WarehouseId warehouseId
+        +ProductId productId
         +int quantity
-        +StoreOrderStatus status
+        +WarehouseOrderStatus status
         +complete()
         +cancel(reason)
     }
-    class Store {
-        <<aggregate root>>
-        +StoreId id
-        +String name
-        +Location location
-        +String warehouseId
+    class WarehouseOrderId {
+        <<value object>>
+        +String id
     }
-    class StoreOrderStatus {
+    class WarehouseOrderStatus {
         <<value object>>
         PENDING
         IN_PRODUCTION
         SHIPPED
         COMPLETED
     }
-    StoreOrder --> StoreOrderStatus
+    WarehouseOrder --> WarehouseOrderStatus
+```
+
+### Module: product
+```mermaid
+classDiagram
+    class Product {
+        <<aggregate root>>
+        +ProductId id
+        +String name
+        +String description
+        +double unitWeight
+    }
+    class ProductId {
+        <<value object>>
+        +String id
+    }
+    Product --> ProductId
 ```
 
 ## Use cases
@@ -155,33 +185,3 @@ flowchart TD
 | dispatch.requested.v1 | Transport |
 | factory.registered.v1 | Time/Map |
 
-## Package structure
-
-```
-production-service/
-├── factory/
-│   ├── domain/
-│   │   ├── Factory.java
-│   │   ├── FactoryId.java
-│   │   └── Location.java
-│   └── ...
-├── production-order/
-│   ├── domain/
-│   │   ├── ProductionOrder.java
-│   │   ├── OrderLine.java
-│   │   ├── OrderId.java
-│   │   └── OrderStatus.java
-│   └── ...
-├── recipe/
-│   ├── domain/
-│   │   ├── Recipe.java
-│   │   ├── RecipeId.java
-│   │   └── Ingredient.java
-│   └── ...
-└── store-order/
-    ├── domain/
-    │   ├── StoreOrder.java
-    │   ├── Store.java
-    │   └── StoreOrderStatus.java
-    └── ...
-```
