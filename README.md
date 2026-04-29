@@ -16,9 +16,6 @@ Distributed system that simulates a supply chain between factories, warehouses a
 
 ![Context Map](context-map.png)
 
-> Solid arrow: async RabbitMQ event
-> Dashed arrow: Reporting consumes all events — read only, does not block any service
-
 ## Main flow — UC-05: Store orders 3 tables
 
 ```mermaid

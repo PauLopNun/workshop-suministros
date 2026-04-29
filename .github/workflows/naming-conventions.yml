@@ -1,0 +1,67 @@
+name: naming conventions
+
+on:
+  push:
+    branches-ignore:
+      - main
+
+  pull_request:
+    branches:
+      - main
+
+
+jobs:
+  check-branch-name:
+    name: Check branch name
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate branch name
+        run: |
+          BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
+          echo "Branch: $BRANCH"
+          if ! echo "$BRANCH" | grep -qE '^(feature|fix|chore|docs|test|refactor)/[a-z0-9]+(-[a-z0-9]+)*$'; then
+            echo "Invalid branch name: $BRANCH"
+            echo "Expected format: type/short-description"
+            echo "Valid types: feature, fix, chore, docs, test, refactor"
+            echo "Example: feature/truck-assignment"
+            exit 1
+          fi
+          echo "Branch name is valid"
+
+  check-commit-messages:
+    name: Check commit messages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate commit messages
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            COMMITS=$(git log --format="%s" ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }})
+          else
+            COMMITS=$(git log --format="%s" -1)
+          fi
+
+          VALID_TYPES="feat|fix|chore|docs|test|refactor"
+          FAILED=0
+
+          while IFS= read -r MSG; do
+            if [ -z "$MSG" ]; then
+              continue
+            fi
+            echo "Checking: $MSG"
+            if ! echo "$MSG" | grep -qE "^($VALID_TYPES): .+"; then
+              echo "Invalid commit message: $MSG"
+              echo "Expected format: type: description"
+              echo "Valid types: feat, fix, chore, docs, test, refactor"
+              echo "Example: feat: add optimal truck selector"
+              FAILED=1
+            fi
+          done <<< "$COMMITS"
+
+          if [ "$FAILED" = "1" ]; then
+            exit 1
+          fi
+          echo "All commit messages are valid"
