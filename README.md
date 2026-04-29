@@ -60,6 +60,34 @@ graph LR
 
 `domain` never depends on JPA, RabbitMQ or any external framework.
 
+## Naming conventions
+
+### Branches
+
+Format: `type/short-description`
+
+Valid types: `feature` `fix` `chore` `docs` `test` `refactor`
+
+Examples:
+
+    feature/truck-assignment
+    fix/stock-checker-null-pointer
+    chore/setup-rabbitmq-config
+
+### Commits
+
+Format: `type: short description`
+
+Valid types: `feat` `fix` `chore` `docs` `test` `refactor`
+
+Examples:
+
+    feat: add optimal truck selector
+    fix: handle null stock when warehouse is empty
+    chore: add liquibase migration for warehouse table
+
+> Both conventions are enforced automatically by the CI pipeline on every push and pull request.
+> 
 ## Tech stack
 
 - Java 21 + Spring Boot 3
