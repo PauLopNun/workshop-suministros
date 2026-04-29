@@ -1,0 +1,137 @@
+openapi: 3.0.3
+info:
+  title: Time + Map API
+  version: 1.0.0
+  description: Controls simulation time and exposes the current map state.
+
+paths:
+  /tick:
+    post:
+      summary: Advance simulation time
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdvanceTimeRequest'
+      responses:
+        '202':
+          description: Time advanced
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdvanceTimeResponse'
+
+  /tick/current-day:
+    get:
+      summary: Get current simulation day
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentDayResponse'
+
+  /map:
+    get:
+      summary: Get full map state
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MapStateResponse'
+
+components:
+  schemas:
+    AdvanceTimeRequest:
+      type: object
+      properties:
+        daysToAdvance:
+          type: integer
+          minimum: 1
+          default: 1
+
+    AdvanceTimeResponse:
+      type: object
+      properties:
+        previousDay:
+          type: integer
+        currentDay:
+          type: integer
+
+    CurrentDayResponse:
+      type: object
+      properties:
+        currentDay:
+          type: integer
+
+    MapStateResponse:
+      type: object
+      properties:
+        simulationDay:
+          type: integer
+        trucks:
+          type: array
+          items:
+            $ref: '#/components/schemas/TruckPosition'
+        factories:
+          type: array
+          items:
+            $ref: '#/components/schemas/FactoryPosition'
+        warehouses:
+          type: array
+          items:
+            $ref: '#/components/schemas/WarehousePosition'
+
+    TruckPosition:
+      type: object
+      properties:
+        truckId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        location:
+          $ref: '#/components/schemas/Location'
+        status:
+          type: string
+          enum: [IDLE, IN_TRANSIT]
+        destLocation:
+          $ref: '#/components/schemas/Location'
+          nullable: true
+
+    FactoryPosition:
+      type: object
+      properties:
+        factoryId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        location:
+          $ref: '#/components/schemas/Location'
+
+    WarehousePosition:
+      type: object
+      properties:
+        warehouseId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        location:
+          $ref: '#/components/schemas/Location'
+
+    Location:
+      type: object
+      required: [x, y]
+      properties:
+        x:
+          type: integer
+          minimum: 0
+          example: 3
+        y:
+          type: integer
+          minimum: 0
+          example: 7
