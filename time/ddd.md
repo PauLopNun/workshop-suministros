@@ -19,12 +19,15 @@ classDiagram
         <<value object>>
         +int value
     }
+
     class TimeAdvancedEvent {
-        <<domain event>>
-        +int simulationDay
-        +int daysAdvanced
-        +String timestamp
-    }
+    <<domain event>>
+    +UUID eventId
+    +int previousDay
+    +int currentDay
+    +int daysAdvanced
+    +Instant occurredAt
+}
     SimulationClock --> SimulationDay
     SimulationClock ..> TimeAdvancedEvent : publishes
 ```
@@ -75,6 +78,7 @@ flowchart TD
     UC1([POST /tick]) --> A1[AdvanceTime]
     A1 --> A2[SimulationClock.advanceDay]
     A2 --> A3[Publishes time.advanced.v1]
+    A3 --> A4[Payload: previousDay, currentDay, daysAdvanced]
 
     UC2([GET /map]) --> B1[GetMapState]
     B1 --> B2[Returns current positions of all elements]
@@ -85,28 +89,12 @@ flowchart TD
     EV4([warehouse.registered.v1 received]) --> C4[Adds warehouse to map]
 ```
 
-## Package structure
+## Contracts with other microservices
 
-```
-time-service/
-├── simulation-clock/
-│   ├── domain/
-│   │   ├── SimulationClock.java
-│   │   ├── SimulationDay.java
-│   │   └── event/TimeAdvancedEvent.java
-│   ├── application/usecase/AdvanceTimeUseCase.java
-│   └── infrastructure/
-│       ├── rest/TickController.java
-│       └── persistence/SimulationClockJpaRepository.java
-└── map-state/
-    ├── domain/
-    │   ├── MapState.java
-    │   ├── TruckPosition.java
-    │   ├── FactoryPosition.java
-    │   ├── WarehousePosition.java
-    │   └── Location.java
-    ├── application/usecase/GetMapStateUseCase.java
-    └── infrastructure/
-        ├── rest/MapController.java
-        └── messaging/MapStateEventListener.java
-```
+| Microservice | Publishes | Consumes | Purpose |
+|---|---|---|---|
+| **Transport** | `time.advanced.v1` | `truck.registered.v1`<br>`truck.assigned.v1`<br>`truck.position.updated.v1`<br>`delivery.completed.v1` | Transport uses the time advance event to move trucks. Time + Map uses Transport events to display trucks on the map and update their positions. |
+| **Production** | `time.advanced.v1` | `factory.registered.v1`<br>`factory.updated.v1` *(optional)* | Production uses the time advance event to progress production orders. Time + Map uses Production events to display factories on the map. |
+| **Warehouse** | `time.advanced.v1` | `warehouse.registered.v1`<br>`warehouse.updated.v1` *(optional)* | Warehouse may use the time advance event to check stock, consumption or replenishment needs. Time + Map uses Warehouse events to display warehouses on the map. |
+| **Reporting** | `time.advanced.v1` | None | Reporting records time advances for history, monitoring and statistics. |
+
