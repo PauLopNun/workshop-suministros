@@ -6,11 +6,11 @@ Distributed system that simulates a supply chain between factories, warehouses a
 
 | Service | Team member | Role |
 |---|---|---|
-| Paso del Tiempo + Mapa | Rubén | Open Host Service — upstream of all |
-| Fábricas + Recetas | Idoia | Customer/Supplier — downstream of Time |
-| Almacenes | Pau | Core Domain — central node |
-| Camiones | Sergi | Conformist — downstream of Almacenes |
-| Reportes | Pedro | Anticorruption Layer — downstream of all |
+| Time Passage + Map + Mapa | Rubén | Open Host Service — upstream of all |
+| Factories + Recipes | Idoia | Customer/Supplier — downstream of Time |
+| Warehouses | Pau | Core Domain — central node |
+| Trucks | Sergi | Conformist — downstream of Almacenes |
+| Reports | Pedro | Anticorruption Layer — downstream of all |
 
 ## Context Map
 
