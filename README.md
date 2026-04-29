@@ -4,7 +4,7 @@ Distributed system that simulates a supply chain between factories, warehouses a
 
 ## Teams
 
-| Service | Leader | Role |
+| Service | Team member | Role |
 |---|---|---|
 | Paso del Tiempo + Mapa | Rubén | Open Host Service — upstream of all |
 | Fábricas + Recetas | Idoia | Customer/Supplier — downstream of Time |
@@ -14,38 +14,7 @@ Distributed system that simulates a supply chain between factories, warehouses a
 
 ## Context Map
 
-```mermaid
-flowchart TB
-    T["**Paso del Tiempo + Mapa**\nRubén · Open Host Service\nupstream de TODOS"]
-
-    T -->|TimeTickEvent| F
-    T -->|TimeTickEvent| A
-    T -->|TimeTickEvent| C
-
-    subgraph mid[ ]
-        direction LR
-        F["**Fábricas + Recetas**\nIdoia · Customer/Supplier\nU respecto Almacenes\nD respecto Tiempo"]
-        A["**Almacenes**\nPau · Core Domain\nnodo central del sistema\nU respecto Camiones"]
-        C["**Camiones**\nSergi · Conformist\nD respecto Almacenes\nD respecto Tiempo"]
-        F -->|MaterialsNeeded| A
-        A -->|StockAvailable| F
-        A -->|ShipmentRequested| C
-        C -->|DeliveryCompleted| A
-    end
-
-    F -.->|todos los eventos| R
-    A -.->|todos los eventos| R
-    C -.->|todos los eventos| R
-
-    R["**Reportes**\nPedro · Anticorruption Layer\ndownstream de todos"]
-
-    style T fill:#d6a427,color:#fff,stroke:#b07800
-    style F fill:#6d3fce,color:#fff,stroke:#4a2a9a
-    style A fill:#1d9e75,color:#fff,stroke:#0f6e56
-    style C fill:#185fa5,color:#fff,stroke:#0c447c
-    style R fill:#993c1d,color:#fff,stroke:#712b13
-    style mid fill:none,stroke:none
-```
+![Context Map](context-map.png)
 
 > Solid arrow: async RabbitMQ event
 > Dashed arrow: Reporting consumes all events — read only, does not block any service
