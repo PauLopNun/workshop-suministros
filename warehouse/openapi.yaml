@@ -1,0 +1,139 @@
+openapi: 3.0.3
+info:
+  title: Warehouse API
+  version: 1.0.0
+  description: Manages inventory, minimum stock rules and replenishment requests.
+
+paths:
+  /warehouses:
+    get:
+      summary: List all warehouses
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WarehouseResponse'
+    post:
+      summary: Register a warehouse
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWarehouseRequest'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WarehouseResponse'
+
+  /warehouses/{warehouseId}:
+    get:
+      summary: Get warehouse by id
+      parameters:
+        - name: warehouseId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WarehouseResponse'
+        '404':
+          description: Warehouse not found
+
+  /warehouses/{warehouseId}/stock:
+    get:
+      summary: Get current stock of a warehouse
+      parameters:
+        - name: warehouseId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StockItemResponse'
+
+components:
+  schemas:
+    Location:
+      type: object
+      required: [x, y]
+      properties:
+        x:
+          type: integer
+          minimum: 0
+        y:
+          type: integer
+          minimum: 0
+
+    StockRule:
+      type: object
+      required: [productId, minQuantity]
+      properties:
+        productId:
+          type: string
+          format: uuid
+        minQuantity:
+          type: integer
+          minimum: 0
+
+    CreateWarehouseRequest:
+      type: object
+      required: [name, location]
+      properties:
+        name:
+          type: string
+          example: North Warehouse
+        location:
+          $ref: '#/components/schemas/Location'
+        isInfiniteStock:
+          type: boolean
+          default: false
+        stockRules:
+          type: array
+          items:
+            $ref: '#/components/schemas/StockRule'
+
+    WarehouseResponse:
+      type: object
+      properties:
+        warehouseId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        location:
+          $ref: '#/components/schemas/Location'
+        isInfiniteStock:
+          type: boolean
+        stockRules:
+          type: array
+          items:
+            $ref: '#/components/schemas/StockRule'
+
+    StockItemResponse:
+      type: object
+      properties:
+        productId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+        minQuantity:
+          type: integer
