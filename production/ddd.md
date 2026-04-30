@@ -177,14 +177,22 @@ flowchart TD
     UC6([replenishment.requested.v1 received]) --> F1[CheckIfProductionCanStart]
 ```
 
-## Events published
+## Events sent
 
 | Event | Consumed by |
 |---|---|
+| factory.registered.v1 | Time/Map, Reporting |
+| dispatch.requested.v1 | Transport |
+| production.materials.requested.v1 | Warehouse |
+| production.order.completed.v1 | Warehouse, Reporting |
 | production.order.created.v1 | Reporting |
 | production.order.started.v1 | Reporting |
 | production.order.blocked.v1 | Reporting |
-| production.order.completed.v1 | Warehouse, Reporting |
-| production.materials.requested.v1 | Warehouse |
-| dispatch.requested.v1 | Transport |
-| factory.registered.v1 | Time/Map |
+
+### Events consumed
+
+| Event | Received by |
+|---|---|
+| time.advanced.v1 | Time |
+| delivery.completed.v1 | Transport, Warehouse |
+| repelnishment.requested.v1 | Warehouse |
