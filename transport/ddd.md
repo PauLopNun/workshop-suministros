@@ -3,9 +3,13 @@
 Manages the truck fleet and deliveries between warehouses.
 Moves trucks on each time tick and notifies when a delivery is completed.
 
+---
+
 ## Modules
 
 ### Module: truck
+
+Each truck is the aggregate root of this module. `Location` and `TruckStatus` are value objects accessed only through `Truck`. `OptimalTruckSelector` is a domain service that crosses both modules to find the best truck given an origin location.
 
 ```mermaid
 classDiagram
@@ -17,12 +21,10 @@ classDiagram
         +TruckStatus status
         +int speed
         +int capacity
-        +String currentDeliveryId
-        +assignDelivery(delivery)
-        +advance(days) DomainEvent
-        +completeDelivery() DomainEvent
+        +DeliveryId currentDeliveryId
+        +assignDelivery(deliveryId) DomainEvent
+        +markDelivered() DomainEvent
         +isAvailable() boolean
-        +distanceTo(location) int
     }
     class TruckId {
         <<value object>>
@@ -35,22 +37,28 @@ classDiagram
     }
     class TruckStatus {
         <<value object>>
-        IDLE
+        AVAILABLE
         IN_TRANSIT
+        DELIVERED
     }
     Truck --> TruckId
     Truck --> Location
     Truck --> TruckStatus
+    Truck --> DeliveryId
 ```
 
+---
+
 ### Module: delivery
+
+`Delivery` is the aggregate root. `DeliveryItem` and `DeliveryId` are value objects accessed only through `Delivery`. `Location` is shared with the truck module. `DistanceCalculator` is a domain service.
 
 ```mermaid
 classDiagram
     class Delivery {
         <<aggregate root>>
         +DeliveryId id
-        +String truckId
+        +TruckId truckId
         +String shipmentId
         +Location origin
         +Location destination
@@ -62,7 +70,7 @@ classDiagram
     }
     class DeliveryItem {
         <<value object>>
-        +String productId
+        +String materialType
         +int quantity
     }
     class DeliveryId {
@@ -70,8 +78,11 @@ classDiagram
         +String value
     }
     Delivery --> DeliveryId
+    Delivery --> TruckId
     Delivery "1" --> "*" DeliveryItem
 ```
+
+---
 
 ## Domain services
 
@@ -79,7 +90,7 @@ classDiagram
 classDiagram
     class OptimalTruckSelector {
         <<domain service>>
-        +findBestTruck(origin, items) Truck
+        +findBestTruck(origin, availableTrucks) Truck
     }
     class DistanceCalculator {
         <<domain service>>
@@ -87,28 +98,62 @@ classDiagram
     }
 ```
 
+---
+
 ## Use cases
+
+### UC1 — shipment.requested.v1 received → Assign truck
 
 ```mermaid
 flowchart TD
-    UC1([dispatch.requested.v1 received]) --> A1[AssignTruck]
+    UC1([shipment.requested.v1 received])
+    UC1 --> A1[AssignTruck use case]
     A1 --> A2[OptimalTruckSelector.findBestTruck]
-    A2 --> A3[Creates Delivery\nSets Truck to IN_TRANSIT]
-    A3 --> A4[Publishes truck.assigned.v1]
-
-    UC2([time.advanced.v1 received]) --> B1[AdvanceTrucks]
-    B1 --> B2[For each IN_TRANSIT Delivery advance]
-    B2 --> B3{isArrived?}
-    B3 -->|YES| B4[Publishes delivery.completed.v1\nTruck back to IDLE]
-    B3 -->|NO| B5[Publishes truck.position.updated.v1]
+    A2 --> A3[Create Delivery\nSet Truck status to IN_TRANSIT]
+    A3 --> A4[Publish truck.status.changed.v1\nreason: DISPATCHED]
 ```
+
+### UC2 — simulation.time.tick received → Advance trucks
+
+```mermaid
+flowchart TD
+    UC2([simulation.time.tick received])
+    UC2 --> B1[AdvanceTrucks use case]
+    B1 --> B2[Calculate daysAdvanced = currentDay - lastDay]
+    B2 --> B3[For each IN_TRANSIT Delivery: advance]
+    B3 --> B4{isArrived?}
+    B4 -->|YES| B5[Publish delivery.completed.v1\nPublish truck.status.changed.v1\nreason: DELIVERED\nTruck back to AVAILABLE]
+    B4 -->|NO| B6[Publish truck.position.updated.v1]
+```
+
+### UC3 — Register truck (REST)
+
+```mermaid
+flowchart TD
+    UC3([POST /trucks])
+    UC3 --> C1[RegisterTruck use case]
+    C1 --> C2[Create Truck\nstatus: AVAILABLE]
+    C2 --> C3[Publish truck.status.changed.v1\nreason: TRUCK_REGISTERED\noldStatus: null]
+```
+
+---
 
 ## Events published
 
-| Event | Consumed by |
-|---|---|
-| truck.registered.v1 | Time/Map, Reporting |
-| truck.assigned.v1 | Time/Map, Reporting |
-| truck.position.updated.v1 | Time/Map |
-| delivery.created.v1 | Reporting |
-| delivery.completed.v1 | Production, Warehouse, Reporting |
+| Event | Trigger | Consumed by |
+|---|---|---|
+| truck.status.changed.v1 | Register, dispatch, delivery, return | Reporting |
+| truck.position.updated.v1 | Each tick while IN_TRANSIT | Map (UI), Reporting |
+| delivery.completed.v1 | Truck arrives at destination | Warehouses, Reporting |
+
+---
+
+## Events consumed
+
+| Event | Emitted by | Use case triggered |
+|---|---|---|
+| shipment.requested.v1 | Warehouses / Factories | AssignTruck |
+| simulation.time.tick | Ruben (Simulation) | AdvanceTrucks |
+
+---
+
