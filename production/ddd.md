@@ -1,4 +1,4 @@
-# Factories — Idoia
+# Production — Idoia
 
 Manages factories, recipes, production orders and store orders.
 
