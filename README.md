@@ -6,7 +6,7 @@ Distributed system that simulates a supply chain between factories, warehouses a
 
 | Service | Team member | Role |
 |---|---|---|
-| Time Passage + Map + Mapa | Rubén | Open Host Service — upstream of all |
+| Time Passage + Map | Rubén | Open Host Service — upstream of all |
 | Factories + Recipes | Idoia | Customer/Supplier — downstream of Time |
 | Warehouses | Pau | Core Domain — central node |
 | Trucks | Sergi | Conformist — downstream of Almacenes |
