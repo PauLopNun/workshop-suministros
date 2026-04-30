@@ -21,10 +21,13 @@ classDiagram
         +TruckStatus status
         +int speed
         +int capacity
-        +DeliveryId currentDeliveryId
-        +assignDelivery(deliveryId) DomainEvent
-        +markDelivered() DomainEvent
+        +int currentLoad
+        +List~DeliveryId~ deliveryIds
+        +assignDelivery(deliveryId, itemCount) DomainEvent
+        +completeDelivery(deliveryId) DomainEvent
+        +hasCapacityFor(itemCount) boolean
         +isAvailable() boolean
+        +isInTransit() boolean
     }
     class TruckId {
         <<value object>>
@@ -90,11 +93,12 @@ classDiagram
 classDiagram
     class OptimalTruckSelector {
         <<domain service>>
-        +findBestTruck(origin, availableTrucks) Truck
+        +findBestTruck(origin, destination, itemCount, trucks) Truck
     }
     class DistanceCalculator {
         <<domain service>>
         +calculate(a, b) int
+        +isOnRoute(point, from, to) boolean
     }
 ```
 
@@ -108,9 +112,13 @@ classDiagram
 flowchart TD
     UC1([shipment.requested.v1 received])
     UC1 --> A1[AssignTruck use case]
-    A1 --> A2[OptimalTruckSelector.findBestTruck]
-    A2 --> A3[Create Delivery\nSet Truck status to IN_TRANSIT]
-    A3 --> A4[Publish truck.status.changed.v1\nreason: DISPATCHED]
+    A1 --> A2[OptimalTruckSelector.findBestTruck\norigin / destination / itemCount / all trucks]
+    A2 --> A3{Truck found?}
+    A3 -->|NO| A9[No truck available — discard or retry]
+    A3 -->|YES AVAILABLE| A4[Create Delivery\nSet Truck status to IN_TRANSIT\nSet currentLoad = itemCount]
+    A3 -->|YES IN_TRANSIT passing by| A5[Create Delivery\nAdd to truck.deliveryIds\nUpdate currentLoad += itemCount]
+    A4 --> A6[Publish truck.status.changed.v1\nreason: DISPATCHED\ncurrentLoad / capacity]
+    A5 --> A7[Publish truck.status.changed.v1\nreason: LOAD_UPDATED\ncurrentLoad / capacity]
 ```
 
 ### UC2 — simulation.time.tick received → Advance trucks
@@ -122,8 +130,11 @@ flowchart TD
     B1 --> B2[Calculate daysAdvanced = currentDay - lastDay]
     B2 --> B3[For each IN_TRANSIT Delivery: advance]
     B3 --> B4{isArrived?}
-    B4 -->|YES| B5[Publish delivery.completed.v1\nPublish truck.status.changed.v1\nreason: DELIVERED\nTruck back to AVAILABLE]
-    B4 -->|NO| B6[Publish truck.position.updated.v1]
+    B4 -->|YES| B5[Publish delivery.completed.v1\nUpdate truck currentLoad -= delivery.itemCount\nTruck.completeDelivery]
+    B5 --> B6{truck.deliveryIds empty?}
+    B6 -->|YES| B7[Set Truck to AVAILABLE\nPublish truck.status.changed.v1\nreason: RETURNED_TO_BASE\ncurrentLoad: 0]
+    B6 -->|NO| B8[Truck stays IN_TRANSIT\nPublish truck.status.changed.v1\nreason: LOAD_UPDATED\ncurrentLoad / capacity]
+    B4 -->|NO| B9[Publish truck.position.updated.v1]
 ```
 
 ### UC3 — Register truck (REST)
@@ -142,9 +153,9 @@ flowchart TD
 
 | Event | Trigger | Consumed by |
 |---|---|---|
-| truck.status.changed.v1 | Register, dispatch, delivery, return | Reporting |
+| truck.status.changed.v1 | Register, dispatch, load updated, delivery, return | Reporting |
 | truck.position.updated.v1 | Each tick while IN_TRANSIT | Map (UI), Reporting |
-| delivery.completed.v1 | Truck arrives at destination | Warehouses, Reporting |
+| delivery.completed.v1 | Truck arrives at a delivery destination | Warehouses, Reporting, Map (UI) |
 
 ---
 
