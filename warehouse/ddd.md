@@ -157,7 +157,7 @@ flowchart TD
     Q2 -->|NO| NO2
 ```
 
-## Events published
+### Events published
 
 | Event | Consumed by |
 |---|---|
