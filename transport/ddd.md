@@ -112,32 +112,3 @@ flowchart TD
 | truck.position.updated.v1 | Time/Map |
 | delivery.created.v1 | Reporting |
 | delivery.completed.v1 | Production, Warehouse, Reporting |
-
-## Package structure
-
-```
-transport-service/
-├── truck/
-│   ├── domain/
-│   │   ├── Truck.java
-│   │   ├── TruckId.java
-│   │   ├── Location.java
-│   │   ├── TruckStatus.java
-│   │   └── service/OptimalTruckSelector.java
-│   ├── application/usecase/
-│   │   ├── RegisterTruck.java
-│   │   └── AssignTruck.java
-│   └── infrastructure/
-│       ├── rest/TruckController.java
-│       └── messaging/DispatchRequestedListener.java
-└── delivery/
-    ├── domain/
-    │   ├── Delivery.java
-    │   ├── DeliveryId.java
-    │   ├── DeliveryItem.java
-    │   └── service/DistanceCalculator.java
-    ├── application/usecase/AdvanceTrucks.java
-    └── infrastructure/messaging/
-        ├── TimeAdvancedListener.java
-        └── DeliveryCompletedPublisher.java
-```
