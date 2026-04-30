@@ -49,17 +49,13 @@ classDiagram
         +String status
         +Location destLocation
     }
-    class FactoryPosition {
-        <<value object>>
-        +String factoryId
-        +String name
-        +Location location
-    }
+
     class WarehousePosition {
         <<value object>>
-        +String warehouseId
+        +String id
         +String name
         +Location location
+        +Type type
     }
     class Location {
         <<value object>>
@@ -67,7 +63,6 @@ classDiagram
         +int y
     }
     MapState "1" --> "*" TruckPosition
-    MapState "1" --> "*" FactoryPosition
     MapState "1" --> "*" WarehousePosition
 ```
 
@@ -94,7 +89,7 @@ flowchart TD
 | Microservice | Publishes | Consumes | Purpose |
 |---|---|---|---|
 | **Transport** | `time.advanced.v1` | `truck.registered.v1 (TruckLocation)`<br>`truck.assigned.v1 (TruckLocation)`<br>`truck.position.updated.v1 (TruckLocation)`<br>`delivery.completed.v1` | Transport uses the time advance event to move trucks. Time + Map uses Transport events to display trucks on the map and update their positions. |
-| **Production** | `time.advanced.v1` | `factory.registered.v1 (FactoryLocation)`<br>`factory.updated.v1 (FactoryLocation)` *(optional)* | Production uses the time advance event to progress production orders. Time + Map uses Production events to display factories on the map. |
+| **Production** | `time.advanced.v1` | `None` | Production uses the time advance event to progress production orders. |
 | **Warehouse** | `time.advanced.v1` | `warehouse.registered.v1 (WarehouseLocation)`<br>`warehouse.updated.v1 (WarehouseLocation)` *(optional)* | Warehouse may use the time advance event to check stock, consumption or replenishment needs. Time + Map uses Warehouse events to display warehouses on the map. |
-| **Reporting** | `time.advanced.v1` | None | Reporting records time advances for history, monitoring and statistics. |
+| **Reporting** | `time.advanced.v1` | `None` | Reporting records time advances for history, monitoring and statistics. |
 
