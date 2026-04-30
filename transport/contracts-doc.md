@@ -28,16 +28,16 @@ Real-time truck position. Designed for high frequency: carries no business data 
 | Field | Type | Notes |
 |---|---|---|
 | `truckId` | String (UUID) | Identifies the truck to move on the map |
-| `x` | Number | X coordinate on the grid |
-| `y` | Number | Y coordinate on the grid |
+| `location` | Value Object | Value Object: no ID. Identified by its coordinates |
+| `location.x` | Number | X coordinate on the grid |
+| `location.y` | Number | Y coordinate on the grid |
 
 **Consumers:** Map (UI) | Reporting
 
 ```json
 {
   "truckId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "x": 5,
-  "y": 3
+  "location": { "x": 8, "y": 2 }
 }
 ```
 
@@ -50,6 +50,7 @@ Confirms that a truck has completed a delivery at a destination warehouse.
 | Field | Type | Notes |
 |---|---|---|
 | `shipmentId` | String (UUID) | Order ID. Used by the receiver to mark the delivery as received |
+| `truckId` | String (UUID) | `[+]` Identifies the truck that completed the delivery. Used by Map (UI) to remove or update the truck icon, and by Reporting to correlate with `truck.status.changed.v1` |
 | `items[]` | Array of Value Objects | Value Object: no ID. Identified by their attributes |
 | `items[].materialType` | String | Type of material delivered (agree naming with the team) |
 | `items[].quantity` | Number | Quantity delivered |
@@ -61,6 +62,9 @@ Confirms that a truck has completed a delivery at a destination warehouse.
 **Consumers:** Warehouses | Reporting
 
 > The `location` field is exclusively for Reporting (log verification and traceability). Warehouses can ignore it — they already know their own location.
+> 
+> Map (UI) only needs `truckId` from this event — to remove or update the truck icon when the delivery is completed. All other fields can be ignored by Map (UI).
+
 
 ```json
 {
