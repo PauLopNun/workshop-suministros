@@ -80,22 +80,3 @@ classDiagram
 | production.order.completed.v1 | Production | Saves to EventLog, updates history |
 | replenishment.requested.v1 | Warehouse | Saves to EventLog |
 | warehouse.stock.changed.v1 | Warehouse | Saves to EventLog, updates stats |
-
-## Package structure
-
-```
-reporting-service/
-├── event-log/
-│   ├── domain/
-│   │   ├── EventLog.java
-│   │   └── EventLogId.java
-│   ├── application/usecase/HandleAnyEvent.java
-│   └── infrastructure/messaging/AllEventsListener.java
-└── blocked-order/
-    ├── domain/BlockedOrder.java
-    ├── application/usecase/
-    │   ├── GetBlockedOrders.java
-    │   ├── GetOrderHistory.java
-    │   └── GetSystemStats.java
-    └── infrastructure/rest/ReportingController.java
-```
