@@ -68,7 +68,7 @@ classDiagram
 
 | Event | Source | Action |
 |---|---|---|
-| time.advanced.v1 | Time | Saves to EventLog |
+| time.advanced.v1 | Time (simulationDay: int, ocurredAt: instant ) | Saves to EventLog |
 | truck.registered.v1 | Transport | Saves to EventLog |
 | truck.assigned.v1 | Transport | Saves to EventLog, updates stats |
 | truck.position.updated.v1 | Transport | Saves to EventLog |
