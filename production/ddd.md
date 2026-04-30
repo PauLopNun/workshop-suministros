@@ -151,14 +151,14 @@ classDiagram
     Product --> ProductId
 ```
 
-## Use cases
+## Events Schema
 
 ```mermaid
 flowchart TD
     UC1([POST /factories]) --> A1[RegisterFactory]
-    A1 --> A2[Creates and persists a Factory]
+    A1 --> A2[Creates and persists a Factory\nPublishes factory.registered.v1]
     UC2([POST /recipes]) --> B1[RegisterRecipe]
-    B1 --> B2[Creates and persists a Recipe\nwith ingredients and output product]
+    B1 --> B2[Creates and persists a Recipe\nwith ingredients and output product\nPublished recipe.registered.v1]
     UC3([POST /warehouses/id/orders]) --> C1[PlaceWarehouseOrder]
     C1 --> C2[Creates ProductionOrder\nPublishes production.materials.requested.v1]
     UC4([time.advanced.v1 received]) --> D1[AdvanceProductionOrders]
@@ -170,11 +170,14 @@ flowchart TD
     UC6([replenishment.requested.v1 received]) --> F1[CheckIfProductionCanStart]
 ```
 
-## Events sent
+## Event table 
+
+### Events sent
 
 | Event | Consumed by |
 |---|---|
 | factory.registered.v1 | Time/Map, Reporting |
+| recipe.registered.v1 | Reporting |
 | dispatch.requested.v1 | Transport |
 | production.materials.requested.v1 | Warehouse |
 | production.order.completed.v1 | Warehouse, Reporting |
