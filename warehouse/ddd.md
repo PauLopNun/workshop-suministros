@@ -7,115 +7,234 @@ Central node of the system. Manages inventory, minimum stock rules and replenish
 ### Module: warehouse
 
 ```mermaid
-classDiagram
-    class Warehouse {
-        <<aggregate root>>
-        +WarehouseId id
-        +String name
-        +Location location
-        +boolean isInfiniteStock
-        +List~StockItem~ stock
-        +List~StockRule~ stockRules
-        +checkOwnStock(items) boolean
-        +consumeStock(items)
-        +receiveDelivery(items)
-        +needsReplenishment() boolean
-    }
-    class StockItem {
-        <<entity>>
-        +String productId
-        +int quantity
-        +isEnough(needed) boolean
-        +add(qty)
-        +subtract(qty)
-    }
-    class StockRule {
-        <<value object>>
-        +String productId
-        +int minQuantity
-    }
-    class Location {
-        <<value object>>
-        +int x
-        +int y
-    }
-    class WarehouseId {
-        <<value object>>
-        +String value
-    }
-    Warehouse --> WarehouseId
-    Warehouse --> Location
-    Warehouse "1" --> "*" StockItem
-    Warehouse "1" --> "*" StockRule
+flowchart TD
+    subgraph API["Layer: API REST"]
+        WC["**WarehouseController**
+        POST /warehouses
+        GET /{id}/stock
+        GET /warehouses"]
+    end
+ 
+    subgraph APP["Layer: Application (Use Cases)"]
+        RW["**RegisterWarehouse**
+        Registers a new warehouse."]
+ 
+        GWS["**GetWarehouseStock**
+        Queries current stock."]
+ 
+        RD["**ReceiveDelivery**
+        Handles DeliveryCompleted event.
+        Registers incoming stock from a delivery
+        and updates warehouse quantities."]
+ 
+        DS["**DispatchShipment**
+        Handles TruckDeparture event.
+        Reduces stock on truck departure
+        and records the shipment dispatch."]
+    end
+ 
+    subgraph DOM["Layer: Domain"]
+        subgraph AGG["Aggregate Root"]
+            WH["**Warehouse**
+            ────────────────────────────
+            id: WarehouseId
+            name: String
+            location: Location
+            minStockRules: Map
+            isStockInfinite: boolean
+            ────────────────────────────
+            + checkOwnStock(items): boolean
+            + consumeStock(items): void
+            + receiveDelivery(items): void
+            + needsReplenishment(): boolean
+            + dispatchItems(items): void"]
+        end
+ 
+        SI["**StockItem** — entity, internal to Warehouse
+        ─────────────────────────────────
+        productId: ProductId
+        quantity: Quantity
+        ─────────────────────────────────
+        + isEnough(needed): boolean
+        + add(qty): void
+        + subtract(qty): void
+        + hasProduct(productId): boolean"]
+    end
+ 
+    subgraph VO["Layer: Value Objects"]
+        VOX["WarehouseId · Location (x, y) · Quantity (value > 0) · ProductId · Type ENUM"]
+    end
+ 
+    WC -->|"calls"| RW
+    WC -->|"calls"| GWS
+    WC -->|"calls"| RD
+    WC -->|"calls"| DS
+ 
+    RW  -->|"orchestrates"| WH
+    GWS -->|"orchestrates"| WH
+    RD  -->|"orchestrates"| WH
+    DS  -->|"orchestrates"| WH
+ 
+    WH  -->|"contains 1..*"| SI
+    WH  -.->|"depends on"| VOX
+    SI  -.->|"depends on"| VOX
+ 
+    classDef apiStyle fill:#F1EFE8,stroke:#B4B2A9,color:#333
+    classDef appStyle fill:#F1EFE8,stroke:#B4B2A9,color:#333
+    classDef aggStyle fill:#e1f5ee,stroke:#1d9e75,color:#085041
+    classDef voStyle  fill:#f5f5f5,stroke:#999,color:#444
+ 
+    class WC apiStyle
+    class RW,GWS,RD,DS appStyle
+    class WH,SI aggStyle
+    class VOX voStyle
 ```
-
-### Module: replenishment
-
-```mermaid
-classDiagram
-    class ReplenishmentRequest {
-        <<aggregate root>>
-        +ReplenishmentId id
-        +String originWarehouseId
-        +String destWarehouseId
-        +List~RequestedItem~ items
-        +ReplenishmentStatus status
-        +assign()
-        +complete()
-    }
-    class RequestedItem {
-        <<value object>>
-        +String productId
-        +int quantity
-    }
-    class ReplenishmentStatus {
-        <<value object>>
-        PENDING
-        IN_TRANSIT
-        COMPLETED
-    }
-    class ReplenishmentId {
-        <<value object>>
-        +String value
-    }
-    ReplenishmentRequest --> ReplenishmentId
-    ReplenishmentRequest --> ReplenishmentStatus
-    ReplenishmentRequest "1" --> "*" RequestedItem
-```
-
-## Domain services
-
-```mermaid
-classDiagram
-    class StockChecker {
-        <<domain service>>
-        +checkOwnStock(warehouse, items) boolean
-    }
-    class ReplenishmentPolicy {
-        <<domain service>>
-        +shouldReplenish(rule, currentQty) boolean
-    }
-    class SupplierWarehouseFinder {
-        <<domain service>>
-        +findSupplier(productId) String
-    }
-```
-
-## Decision logic — production.materials.requested.v1
-
+ 
+---
+ 
+## Module: Replenishment
+ 
 ```mermaid
 flowchart TD
-    IN([production.materials.requested.v1 received]) --> A
-    A{Own stock sufficient?}
-    A -->|YES| B[Deducts stock\nPublishes warehouse.stock.changed.v1]
-    A -->|NO| C[Finds supplier warehouse]
-    C --> D{Supplier found?}
-    D -->|YES| E[Creates ReplenishmentRequest\nPublishes replenishment.requested.v1\nPublishes dispatch.requested.v1]
-    D -->|NO| F[Publishes production.order.blocked.v1]
-    B --> Z([Production starts manufacturing])
-    E --> G([Transport assigns a truck])
-    F --> H([Reporting registers blocked order])
+    subgraph APP["Layer: Application (Use Cases)"]
+        HTT["**HandleTimeTick**
+        Triggers auto-replenishment check
+        on every time tick event."]
+    end
+ 
+    subgraph DOM["Layer: Domain"]
+        subgraph AGG["Aggregate Root"]
+            WH["**Warehouse**
+            ────────────────────────────
+            + needsReplenishment(): boolean
+            + dispatchItems(items): void"]
+        end
+ 
+        subgraph SVC["Domain Services"]
+            RP["**ReplenishmentPolicy**
+            shouldReplenish() → boolean"]
+ 
+            SWF["**SupplierWarehouseFinder**
+            findSupplier(factoryRecipe) → WarehouseId?
+            — finds supplier by factory recipe"]
+        end
+    end
+ 
+    subgraph EVT["Events Published"]
+        E5["**ReplenishmentRequested**
+        { warehouseId, factoryRecipe, items[] }
+        → Supplier"]
+    end
+ 
+    subgraph VO["Layer: Value Objects"]
+        VOX["WarehouseId · Quantity (value > 0) · ProductId"]
+    end
+ 
+    HTT -->|"orchestrates"| WH
+    WH  -.->|"uses"| RP
+    WH  -.->|"uses"| SWF
+    SWF -->|"publishes"| E5
+    WH  -.->|"depends on"| VOX
+ 
+    classDef appStyle fill:#F1EFE8,stroke:#B4B2A9,color:#333
+    classDef aggStyle fill:#e1f5ee,stroke:#1d9e75,color:#085041
+    classDef svcStyle fill:#f5f5f5,stroke:#999,color:#444
+    classDef evtStyle fill:#e1f5ee,stroke:#1d9e75,color:#085041
+    classDef voStyle  fill:#f5f5f5,stroke:#999,color:#444
+ 
+    class HTT appStyle
+    class WH aggStyle
+    class RP,SWF svcStyle
+    class E5 evtStyle
+    class VOX voStyle
 ```
+ 
+---
+ 
+## Module: Services
+ 
+```mermaid
+flowchart TD
+    subgraph SVC["Domain Services"]
+        SC["**StockChecker**
+        checkOwnStock() → boolean
+        Verifies whether the warehouse
+        holds enough stock for the request."]
+ 
+        RP["**ReplenishmentPolicy**
+        shouldReplenish() → boolean
+        Evaluates min stock rules to decide
+        if replenishment is needed."]
+ 
+        SWF["**SupplierWarehouseFinder**
+        findSupplier(factoryRecipe) → WarehouseId?
+        Searches for a warehouse that can
+        supply based on the factory recipe."]
+    end
+ 
+    subgraph AGG["Aggregate Root — Warehouse (consumer)"]
+        WH["**Warehouse**
+        + checkOwnStock(items): boolean
+        + needsReplenishment(): boolean"]
+    end
+ 
+    WH -.->|"uses"| SC
+    WH -.->|"uses"| RP
+    WH -.->|"uses"| SWF
+ 
+    classDef aggStyle fill:#e1f5ee,stroke:#1d9e75,color:#085041
+    classDef svcStyle fill:#f5f5f5,stroke:#999,color:#444
+ 
+    class WH aggStyle
+    class SC,RP,SWF svcStyle
+```
+ 
+---
+ 
+## Decision Logic — `production.materials.requested.v1`
+ 
+```mermaid
+flowchart TD
+    START(["MaterialsNeeded event received"])
+ 
+    Q1{"1. Does the warehouse
+    have enough own stock?"}
+ 
+    YES1["Publish **StockAvailable**
+    { orderId, warehouseId }
+    → Factories"]
+ 
+    NO1["Publish **StockUnavailable**
+    { orderId } → Reports
+    Order blocked — search other warehouses"]
+ 
+    Q2{"2. Found another warehouse
+    with sufficient stock?"}
+ 
+    YES2["Publish **ShipmentRequested**
+    { shipmentId, originId, destId, items[], priority }
+    → Trucks"]
+ 
+    NO2["Fatal ERROR - No warehouse is producing stock,
+    order canceled"]
+ 
+    START --> Q1
+    Q1 -->|"YES"| YES1
+    Q1 -->|"NO"| NO1
+    NO1 --> Q2
+    Q2 -->|"YES"| YES2
+    Q2 -->|"NO"| NO2
+ 
+    classDef decision  fill:#fff9c4,stroke:#f9a825,color:#633806
+    classDef published fill:#e1f5ee,stroke:#1d9e75,color:#085041
+    classDef start     fill:#e8f0fe,stroke:#4a90d9,color:#1a3a5c
+ 
+    class Q1,Q2 decision
+    class YES1,YES2,NO1,REP published
+    class START start
+```
+
+
 
 ## Events published
 
@@ -126,36 +245,3 @@ flowchart TD
 | dispatch.requested.v1 | Transport |
 | warehouse.registered.v1 | Time/Map |
 
-## Package structure
-
-```
-warehouse-service/
-├── warehouse/
-│   ├── domain/
-│   │   ├── Warehouse.java
-│   │   ├── StockItem.java
-│   │   ├── StockRule.java
-│   │   ├── WarehouseId.java
-│   │   ├── Location.java
-│   │   └── service/
-│   │       ├── StockChecker.java
-│   │       ├── ReplenishmentPolicy.java
-│   │       └── SupplierWarehouseFinder.java
-│   ├── application/usecase/
-│   │   ├── HandleMaterialsRequested.java
-│   │   ├── HandleDeliveryCompleted.java
-│   │   ├── HandleTimeAdvanced.java
-│   │   └── RegisterWarehouse.java
-│   └── infrastructure/
-│       ├── rest/WarehouseController.java
-│       ├── persistence/WarehouseJpaRepository.java
-│       └── messaging/MaterialsRequestedListener.java
-└── replenishment/
-    ├── domain/
-    │   ├── ReplenishmentRequest.java
-    │   ├── ReplenishmentId.java
-    │   ├── RequestedItem.java
-    │   └── ReplenishmentStatus.java
-    ├── application/usecase/CreateReplenishmentRequest.java
-    └── infrastructure/messaging/ReplenishmentPublisher.java
-```
