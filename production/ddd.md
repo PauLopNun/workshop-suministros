@@ -1,13 +1,14 @@
-# Prouction — Idoia
+# Production — Idoia
 
 Manages factories, recipes, production orders and store orders.
 
-## Modules
-
-### Module: factory
+## Core Domain Model
 
 ```mermaid
 classDiagram
+    %% =======================
+    %% FACTORY AGGREGATE
+    %% =======================
     class Factory {
         <<aggregate root>>
         +FactoryId id
@@ -26,14 +27,13 @@ classDiagram
         +int x
         +int y
     }
+    
     Factory --> FactoryId
     Factory --> Location
-```
 
-### Module: production-order
-
-```mermaid
-classDiagram
+    %% =======================
+    %% PRODUCTION ORDER AGGREGATE
+    %% =======================
     class ProductionOrder {
         <<aggregate root>>
         +OrderId id
@@ -64,15 +64,14 @@ classDiagram
         COMPLETED
         BLOCKED
     }
+    
     ProductionOrder --> OrderId
     ProductionOrder --> OrderStatus
     ProductionOrder --> OrderLine
-```
 
-### Module: recipe
-
-```mermaid
-classDiagram
+    %% =======================
+    %% RECIPE & INGREDIENT AGGREGATES
+    %% =======================
     class Recipe {
         <<aggregate root>>
         +RecipeId id
@@ -99,16 +98,15 @@ classDiagram
         <<value object>>
         +String id
     }
+    
     Recipe --> RecipeId
     Recipe --> RecipeIngredient : contains
     RecipeIngredient --> IngredientId
     Ingredient --> IngredientId
-```
 
-### Module: warehouse-order
-
-```mermaid
-classDiagram
+    %% =======================
+    %% WAREHOUSE ORDER AGGREGATE
+    %% =======================
     class WarehouseOrder {
         <<aggregate root>>
         +WarehouseOrderId id
@@ -130,13 +128,13 @@ classDiagram
         SHIPPED
         COMPLETED
     }
+    
     WarehouseOrder --> WarehouseOrderStatus
     WarehouseOrder --> WarehouseOrderId
-```
 
-### Module: product
-```mermaid
-classDiagram
+    %% =======================
+    %% PRODUCT AGGREGATE
+    %% =======================
     class Product {
         <<aggregate root>>
         +ProductId id
@@ -148,7 +146,19 @@ classDiagram
         <<value object>>
         +String id
     }
+    
     Product --> ProductId
+
+    %% =======================
+    %% CROSS-AGGREGATE RELATIONSHIPS
+    %% =======================
+    Factory ..> RecipeId : assigns
+    ProductionOrder ..> FactoryId : placed at
+    ProductionOrder ..> RecipeId : uses
+    ProductionOrder ..> WarehouseOrderId : fulfills
+    OrderLine ..> ProductId : requires
+    Recipe ..> ProductId : produces
+    WarehouseOrder ..> ProductId : requests
 ```
 
 ## Events Schema
@@ -170,9 +180,9 @@ flowchart TD
     UC6([replenishment.requested.v1 received]) --> F1[CheckIfProductionCanStart]
 ```
 
-## Event table 
+## Event Table
 
-### Events sent
+### Events Sent
 
 | Event | Consumed by |
 |---|---|
@@ -184,10 +194,10 @@ flowchart TD
 | production.order.started.v1 | Reporting |
 | production.order.blocked.v1 | Reporting |
 
-### Events consumed
+### Events Consumed
 
 | Event | Received by |
 |---|---|
 | time.advanced.v1 | Time |
 | delivery.completed.v1 | Transport, Warehouse |
-| repelnishment.requested.v1 | Warehouse |
+| replenishment.requested.v1 | Warehouse |
