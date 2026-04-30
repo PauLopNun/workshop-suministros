@@ -176,7 +176,6 @@ flowchart TD
 
 | Event | Consumed by |
 |---|---|
-| factory.registered.v1 | Time/Map, Reporting |
 | recipe.registered.v1 | Reporting |
 | dispatch.requested.v1 | Transport |
 | production.materials.requested.v1 | Warehouse |
