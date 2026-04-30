@@ -26,8 +26,15 @@ classDiagram
         +int x
         +int y
     }
+    class FactoryLocation {
+        <<value object>>
+        +FactoryId factoryId
+        +String name
+        +Location location
+    }
     Factory --> FactoryId
     Factory --> Location
+    Factory --> FactoryLocation
 ```
 
 ### Module: production-order
