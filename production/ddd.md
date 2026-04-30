@@ -64,14 +64,9 @@ classDiagram
         COMPLETED
         BLOCKED
     }
-    class OrderId {
-        <<value object>>
-        +String id
-    }
     ProductionOrder --> OrderId
     ProductionOrder --> OrderStatus
-    ProductionOrder "1" --> "*" OrderLine
-    ProductionOrder --> OrderId
+    ProductionOrder --> OrderLine
 ```
 
 ### Module: recipe
@@ -105,7 +100,7 @@ classDiagram
         +String id
     }
     Recipe --> RecipeId
-    Recipe "1" --> "*" RecipeIngredient : contains
+    Recipe --> RecipeIngredient : contains
     RecipeIngredient --> IngredientId
     Ingredient --> IngredientId
 ```
@@ -136,6 +131,7 @@ classDiagram
         COMPLETED
     }
     WarehouseOrder --> WarehouseOrderStatus
+    WarehouseOrder --> WarehouseOrderId
 ```
 
 ### Module: product
@@ -159,18 +155,19 @@ classDiagram
 
 ```mermaid
 flowchart TD
-    UC1([POST /stores/id/orders]) --> A1[PlaceStoreOrder]
-    A1 --> A2[Creates ProductionOrder\nPublishes production.materials.requested.v1]
-
-    UC2([time.advanced.v1 received]) --> B1[AdvanceProductionOrders]
-    B1 --> B2[Decrements remainingDays for each IN_PROGRESS order]
-    B2 --> B3{remainingDays == 0?}
-    B3 -->|YES| B4[Publishes production.order.completed.v1\nPublishes dispatch.requested.v1]
-
-    UC3([delivery.completed.v1 received]) --> C1[HandleMaterialsArrived]
-    C1 --> C2[Publishes production.order.started.v1]
-
-    UC4([replenishment.requested.v1 received]) --> D1[CheckIfProductionCanStart]
+    UC1([POST /factories]) --> A1[RegisterFactory]
+    A1 --> A2[Creates and persists a Factory]
+    UC2([POST /recipes]) --> B1[RegisterRecipe]
+    B1 --> B2[Creates and persists a Recipe\nwith ingredients and output product]
+    UC3([POST /warehouses/id/orders]) --> C1[PlaceWarehouseOrder]
+    C1 --> C2[Creates ProductionOrder\nPublishes production.materials.requested.v1]
+    UC4([time.advanced.v1 received]) --> D1[AdvanceProductionOrders]
+    D1 --> D2[Decrements remainingDays for each IN_PROGRESS order]
+    D2 --> D3{remainingDays == 0?}
+    D3 -->|YES| D4[Publishes production.order.completed.v1\nPublishes dispatch.requested.v1]
+    UC5([delivery.completed.v1 received]) --> E1[HandleMaterialsArrived]
+    E1 --> E2[Publishes production.order.started.v1]
+    UC6([replenishment.requested.v1 received]) --> F1[CheckIfProductionCanStart]
 ```
 
 ## Events published
@@ -184,4 +181,3 @@ flowchart TD
 | production.materials.requested.v1 | Warehouse |
 | dispatch.requested.v1 | Transport |
 | factory.registered.v1 | Time/Map |
-
