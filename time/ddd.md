@@ -80,8 +80,7 @@ flowchart TD
 
     EV1([truck.assigned.v1 received]) --> C1[Updates TruckPosition in MapState]
     EV2([delivery.completed.v1 received]) --> C2[Sets truck status to IDLE]
-    EV3([factory.registered.v1 received]) --> C3[Adds factory to map]
-    EV4([warehouse.registered.v1 received]) --> C4[Adds warehouse to map]
+    EV3([warehouse.registered.v1 received]) --> C4[Adds warehouse to map]
 ```
 
 ## Contracts with other microservices
