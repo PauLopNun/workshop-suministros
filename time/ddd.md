@@ -38,21 +38,19 @@ classDiagram
 classDiagram
     class MapState {
         <<aggregate root>>
-        +updateTruckPosition(truckId, location)
-        +registerFactory(factoryId, name, location)
+        +updateTruckPosition(TruckPosition)
+        +deliveryCompleted(TruckId)
         +registerWarehouse(warehouseId, name, location)
     }
     class TruckPosition {
         <<value object>>
-        +String truckId
+        +UUID truckId
         +Location location
-        +String status
-        +Location destLocation
     }
 
     class WarehousePosition {
         <<value object>>
-        +String id
+        +UUID id
         +String name
         +Location location
         +Type type
@@ -78,7 +76,7 @@ flowchart TD
     UC2([GET /map]) --> B1[GetMapState]
     B1 --> B2[Returns current positions of all elements]
 
-    EV1([truck.assigned.v1 received]) --> C1[Updates TruckPosition in MapState]
+    EV1([truck.position.updated.v1 received]) --> C1[Updates TruckPosition in MapState]
     EV2([delivery.completed.v1 received]) --> C2[Sets truck status to IDLE]
     EV3([warehouse.registered.v1 received]) --> C4[Adds warehouse to map]
 ```
@@ -87,7 +85,7 @@ flowchart TD
 
 | Microservice | Publishes | Consumes | Purpose |
 |---|---|---|---|
-| **Transport** | `time.advanced.v1` | `truck.registered.v1 (TruckLocation)`<br>`truck.assigned.v1 (TruckLocation)`<br>`truck.position.updated.v1 (TruckLocation)`<br>`delivery.completed.v1` | Transport uses the time advance event to move trucks. Time + Map uses Transport events to display trucks on the map and update their positions. |
+| **Transport** | `time.advanced.v1` | `truck.position.updated.v1 (TruckLocation)`<br>`delivery.completed.v1` | Transport uses the time advance event to move trucks. Time + Map uses Transport events to display trucks on the map and update their positions. |
 | **Production** | `time.advanced.v1` | `None` | Production uses the time advance event to progress production orders. |
 | **Warehouse** | `time.advanced.v1` | `warehouse.registered.v1 (WarehouseLocation)`<br>`warehouse.updated.v1 (WarehouseLocation)` *(optional)* | Warehouse may use the time advance event to check stock, consumption or replenishment needs. Time + Map uses Warehouse events to display warehouses on the map. |
 | **Reporting** | `time.advanced.v1` | `None` | Reporting records time advances for history, monitoring and statistics. |
