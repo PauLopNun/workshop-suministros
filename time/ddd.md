@@ -93,8 +93,8 @@ flowchart TD
 
 | Microservice | Publishes | Consumes | Purpose |
 |---|---|---|---|
-| **Transport** | `time.advanced.v1` | `truck.registered.v1`<br>`truck.assigned.v1`<br>`truck.position.updated.v1`<br>`delivery.completed.v1` | Transport uses the time advance event to move trucks. Time + Map uses Transport events to display trucks on the map and update their positions. |
-| **Production** | `time.advanced.v1` | `factory.registered.v1`<br>`factory.updated.v1` *(optional)* | Production uses the time advance event to progress production orders. Time + Map uses Production events to display factories on the map. |
-| **Warehouse** | `time.advanced.v1` | `warehouse.registered.v1`<br>`warehouse.updated.v1` *(optional)* | Warehouse may use the time advance event to check stock, consumption or replenishment needs. Time + Map uses Warehouse events to display warehouses on the map. |
+| **Transport** | `time.advanced.v1` | `truck.registered.v1 (TruckLocation)`<br>`truck.assigned.v1 (TruckLocation)`<br>`truck.position.updated.v1 (TruckLocation)`<br>`delivery.completed.v1` | Transport uses the time advance event to move trucks. Time + Map uses Transport events to display trucks on the map and update their positions. |
+| **Production** | `time.advanced.v1` | `factory.registered.v1 (FactoryLocation)`<br>`factory.updated.v1 (FactoryLocation)` *(optional)* | Production uses the time advance event to progress production orders. Time + Map uses Production events to display factories on the map. |
+| **Warehouse** | `time.advanced.v1` | `warehouse.registered.v1 (WarehouseLocation)`<br>`warehouse.updated.v1 (WarehouseLocation)` *(optional)* | Warehouse may use the time advance event to check stock, consumption or replenishment needs. Time + Map uses Warehouse events to display warehouses on the map. |
 | **Reporting** | `time.advanced.v1` | None | Reporting records time advances for history, monitoring and statistics. |
 
