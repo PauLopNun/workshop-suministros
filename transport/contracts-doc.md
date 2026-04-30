@@ -89,10 +89,13 @@ Notifies a change in a truck's status. Allows Reporting to trace the complete li
 | `truckId` | String (UUID) | Truck whose status has changed |
 | `oldStatus` | Enum \| null | Previous status. `null` on the truck's initial registration |
 | `newStatus` | Enum | New status: `AVAILABLE` \| `IN_TRANSIT` \| `DELIVERED` |
+| `position` | Value Object | Value Object: no ID. Identified by its coordinates |
 | `position.x` | Number | X coordinate at the moment of the change |
 | `position.y` | Number | Y coordinate at the moment of the change |
+| `currentLoad` | Integer | `[+]` Number of DeliveryItems the truck is currently carrying |
+| `capacity` | Integer | `[+]` Maximum number of DeliveryItems the truck can carry |
 | `timestamp` | ISO-8601 | Timestamp of the status change |
-| `reason` | String | Change context for Reporting. E.g.: `TRUCK_REGISTERED`, `DISPATCHED`, `DELIVERED`, `RETURNED_TO_BASE` |
+| `reason` | String | Change context for Reporting. E.g.: `TRUCK_REGISTERED`, `DISPATCHED`, `LOAD_UPDATED`, `RETURNED_TO_BASE` |
 | `reasonCode` | Enum | `[-] MVP` — Typed enum to be implemented with BREAKDOWN |
 
 **Consumers:** Reporting
@@ -100,6 +103,8 @@ Notifies a change in a truck's status. Allows Reporting to trace the complete li
 **Status cycle:** `AVAILABLE` -> `IN_TRANSIT` -> `DELIVERED` -> `AVAILABLE`
 
 **Truck registration:** There is no separate registration event. When a truck is registered, this same event is emitted with `newStatus: AVAILABLE` and `oldStatus: null`. Reporting detects the registration by interpreting the first event with `oldStatus null` for a given `truckId`.
+
+**Multi-delivery:** When a truck already `IN_TRANSIT` accepts an additional shipment that is on its route and within capacity, this event is published with `reason: LOAD_UPDATED` and the status unchanged (`IN_TRANSIT`). When a truck completes one delivery but still carries others, it also publishes `reason: LOAD_UPDATED` with the updated `currentLoad`.
 
 Example — truck registration:
 
@@ -109,6 +114,8 @@ Example — truck registration:
   "oldStatus": null,
   "newStatus": "AVAILABLE",
   "position": { "x": 0, "y": 0 },
+  "currentLoad": 0,
+  "capacity": 10,
   "timestamp": "2026-04-29T08:00:00Z",
   "reason": "TRUCK_REGISTERED"
 }
@@ -122,8 +129,25 @@ Example — dispatch to shipment:
   "oldStatus": "AVAILABLE",
   "newStatus": "IN_TRANSIT",
   "position": { "x": 0, "y": 0 },
+  "currentLoad": 6,
+  "capacity": 10,
   "timestamp": "2026-04-29T09:15:00Z",
   "reason": "DISPATCHED"
+}
+```
+
+Example — additional load picked up while in transit:
+
+```json
+{
+  "truckId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "oldStatus": "IN_TRANSIT",
+  "newStatus": "IN_TRANSIT",
+  "position": { "x": 3, "y": 2 },
+  "currentLoad": 9,
+  "capacity": 10,
+  "timestamp": "2026-04-29T10:00:00Z",
+  "reason": "LOAD_UPDATED"
 }
 ```
 
@@ -193,7 +217,7 @@ Request to transport materials between two points. This contract covers the iden
 | Event | Direction | Consumers / Emitter |
 |---|---|---|
 | `truck.position.updated.v1` | PUBLISHES | Map (UI) \| Reporting |
-| `delivery.completed.v1` | PUBLISHES | Warehouses \| Reporting |
+| `delivery.completed.v1` | PUBLISHES | Warehouses \| Reporting \| Map (UI) |
 | `truck.status.changed.v1` | PUBLISHES | Reporting |
 | `simulation.time.tick` | CONSUMES | Emitted by: Ruben (Simulation) |
 | `shipment.requested.v1` [NEW] | CONSUMES | Emitted by: Warehouses / Factories |
