@@ -180,24 +180,32 @@ flowchart TD
     UC6([replenishment.requested.v1 received]) --> F1[CheckIfProductionCanStart]
 ```
 
+## Use case
+
+```mermaid
+flowchart TD
+    A0[Receives a order from the warehouse] --> A1[Search materials from warehouse]
+    --> A2[Receive the materials from warehouse] --> A3[Crafts the products]
+    --> A4[Send the products to the warehouse]
+```
+
 ## Event Table
 
 ### Events Sent
 
-| Event | Consumed by |
-|---|---|
-| recipe.registered.v1 | Reporting |
-| dispatch.requested.v1 | Transport |
+| Event | Consumed by | Type |
+|---|---|---|
+| recipe.registered.v1 | Reporting | Factory |
 | production.materials.requested.v1 | Warehouse |
-| production.order.completed.v1 | Warehouse, Reporting |
-| production.order.created.v1 | Reporting |
-| production.order.started.v1 | Reporting |
-| production.order.blocked.v1 | Reporting |
+| production.order.completed.v1 | Warehouse, Reporting | WarehouseOrder |
+| production.order.created.v1 | Reporting | ProductionOrder |
+| production.order.started.v1 | Reporting | ProductionOrder |
+| production.order.blocked.v1 | Reporting | ProductionOrder |
 
 ### Events Consumed
 
-| Event | Received by |
-|---|---|
-| time.advanced.v1 | Time |
-| delivery.completed.v1 | Transport, Warehouse |
-| replenishment.requested.v1 | Warehouse |
+| Event | Received by | Type |
+|---|---|---|
+| time.advanced.v1 | Time | |
+| delivery.completed.v1 | Warehouse | |
+| replenishment.requested.v1 | Warehouse | |
