@@ -98,3 +98,31 @@ Examples:
 - Lombok
 - Docker Compose
 - GitHub Actions
+
+---
+
+## Definition of Ready
+
+*A task is ready to be developed when:*
+
+- [ ] The description is clear and the team understands it without needing to ask
+- [ ] The messaging contracts it depends on are agreed and documented
+- [ ] Dependencies with other teams are identified and unblocked
+- [ ] Acceptance criteria are defined
+- [ ] The team has estimated it
+
+---
+
+## Definition of Done
+
+*A task is done when:*
+
+- [ ] The code is on a branch following the correct format (`feature/`, `fix/`, etc.)
+- [ ] Commits follow the format `type: short description`
+- [ ] The PR is open, reviewed and approved by at least one team member
+- [ ] The domain has no dependencies on JPA, RabbitMQ or any external framework
+- [ ] Domain unit tests pass
+- [ ] Integration tests with Testcontainers pass (RabbitMQ + PostgreSQL)
+- [ ] A Liquibase migration is included if there are database changes
+- [ ] Any published or consumed contract is documented in `contracts-doc.md`
+- [ ] The GitHub Actions pipeline is green
