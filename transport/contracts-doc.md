@@ -57,7 +57,7 @@ Confirms that a truck has completed a delivery at a destination warehouse.
 | `location` | Value Object | Value Object: no ID. Identified by its coordinates |
 | `location.x` | Number | X coordinate of the destination |
 | `location.y` | Number | Y coordinate of the destination |
-| `completedAt` | ISO-8601 | `[+]` Exact delivery timestamp. Required to calculate transit times in Reporting |
+| `completedAt` | Integer | `[+]` Simulation day on which the delivery was completed. Required to calculate transit times in Reporting |
 
 **Consumers:** Warehouses | Reporting
 
@@ -69,12 +69,13 @@ Confirms that a truck has completed a delivery at a destination warehouse.
 ```json
 {
   "shipmentId": "f7e6d5c4-b3a2-1098-fedc-ba9876543210",
+  "truckId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "items": [
     { "materialType": "wood", "quantity": 6 },
     { "materialType": "nails", "quantity": 12 }
   ],
   "location": { "x": 8, "y": 2 },
-  "completedAt": "2026-04-29T10:34:00Z"
+  "completedAt": 5
 }
 ```
 
@@ -94,7 +95,7 @@ Notifies a change in a truck's status. Allows Reporting to trace the complete li
 | `position.y` | Number | Y coordinate at the moment of the change |
 | `currentLoad` | Integer | `[+]` Number of DeliveryItems the truck is currently carrying |
 | `capacity` | Integer | `[+]` Maximum number of DeliveryItems the truck can carry |
-| `timestamp` | ISO-8601 | Timestamp of the status change |
+| `timestamp` | Integer | Simulation day of the status change |
 | `reason` | String | Change context for Reporting. E.g.: `TRUCK_REGISTERED`, `DISPATCHED`, `LOAD_UPDATED`, `RETURNED_TO_BASE` |
 | `reasonCode` | Enum | `[-] MVP` — Typed enum to be implemented with BREAKDOWN |
 
@@ -116,7 +117,7 @@ Example — truck registration:
   "position": { "x": 0, "y": 0 },
   "currentLoad": 0,
   "capacity": 10,
-  "timestamp": "2026-04-29T08:00:00Z",
+  "timestamp": 1,
   "reason": "TRUCK_REGISTERED"
 }
 ```
@@ -131,7 +132,7 @@ Example — dispatch to shipment:
   "position": { "x": 0, "y": 0 },
   "currentLoad": 6,
   "capacity": 10,
-  "timestamp": "2026-04-29T09:15:00Z",
+  "timestamp": 3,
   "reason": "DISPATCHED"
 }
 ```
@@ -146,7 +147,7 @@ Example — additional load picked up while in transit:
   "position": { "x": 3, "y": 2 },
   "currentLoad": 9,
   "capacity": 10,
-  "timestamp": "2026-04-29T10:00:00Z",
+  "timestamp": 4,
   "reason": "LOAD_UPDATED"
 }
 ```
@@ -159,7 +160,7 @@ The Transport Service listens to these events from RabbitMQ.
 
 ---
 
-### `simulation.time.tick`
+### `time.advanced.v1`
 
 System time engine. The Simulation service sends the current day as an integer. The Transport service calculates internally how many days have advanced by comparing against the last received day.
 
@@ -191,7 +192,7 @@ Request to transport materials between two points. This contract covers the iden
 | `items[]` | Array of Value Objects | Value Object: no ID. Identified by their attributes |
 | `items[].materialType` | String | Type of material to transport |
 | `items[].quantity` | Number | Quantity to transport |
-| `requestedAt` | ISO-8601 | Timestamp when the request was made |
+| `requestedAt` | Integer | Simulation day on which the request was made |
 
 **Emitter:** Warehouses / Factories
 
@@ -206,7 +207,7 @@ Request to transport materials between two points. This contract covers the iden
     { "materialType": "wood", "quantity": 6 },
     { "materialType": "nails", "quantity": 12 }
   ],
-  "requestedAt": "2026-04-29T09:10:00Z"
+  "requestedAt": 3
 }
 ```
 
@@ -219,7 +220,7 @@ Request to transport materials between two points. This contract covers the iden
 | `truck.position.updated.v1` | PUBLISHES | Map (UI) \| Reporting |
 | `delivery.completed.v1` | PUBLISHES | Warehouses \| Reporting \| Map (UI) |
 | `truck.status.changed.v1` | PUBLISHES | Reporting |
-| `simulation.time.tick` | CONSUMES | Emitted by: Ruben (Simulation) |
+| `time.advanced.v1` | CONSUMES | Emitted by: Ruben (Simulation) |
 | `shipment.requested.v1` [NEW] | CONSUMES | Emitted by: Warehouses / Factories |
 
 ---
