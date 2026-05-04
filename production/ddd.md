@@ -155,7 +155,6 @@ classDiagram
     ProductionOrder ..> FactoryId : placed at
     ProductionOrder ..> RecipeId : uses
     ProductionOrder ..> WarehouseOrderId : fulfills
-    OrderLine ..> ProductId : requires
     Recipe ..> ProductId : produces
     WarehouseOrder ..> ProductId : requests
 ```
