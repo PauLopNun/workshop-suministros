@@ -140,7 +140,6 @@ classDiagram
         +ProductId id
         +String name
         +String description
-        +double unitWeight
     }
     class ProductId {
         <<value object>>
