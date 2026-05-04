@@ -175,6 +175,8 @@ flowchart TD
     UC5([delivery.completed.v1 received]) --> E1[HandleMaterialsArrived]
     E1 --> E2[Publishes production.order.started.v1]
     UC6([replenishment.requested.v1 received]) --> F1[CheckIfProductionCanStart]
+    UC7([GET /recipes]) --> G1[GetAllRecipes]
+    G1 --> G2[Gets all recipes so warehouses can see if the factory can produce what they need]
 ```
 
 ## Use case
