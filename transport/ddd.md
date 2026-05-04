@@ -121,11 +121,11 @@ flowchart TD
     A5 --> A7[Publish truck.status.changed.v1\nreason: LOAD_UPDATED\ncurrentLoad / capacity]
 ```
 
-### UC2 — simulation.time.tick received → Advance trucks
+### UC2 — time.advanced.v1 received → Advance trucks
 
 ```mermaid
 flowchart TD
-    UC2([simulation.time.tick received])
+    UC2([time.advanced.v1 received])
     UC2 --> B1[AdvanceTrucks use case]
     B1 --> B2[Calculate daysAdvanced = currentDay - lastDay]
     B2 --> B3[For each IN_TRANSIT Delivery: advance]
@@ -137,15 +137,31 @@ flowchart TD
     B4 -->|NO| B9[Publish truck.position.updated.v1]
 ```
 
-### UC3 — Register truck (REST)
+### UC3 — Register truck (REST) + Initial state for Map (UI)
 
 ```mermaid
 flowchart TD
     UC3([POST /trucks])
     UC3 --> C1[RegisterTruck use case]
-    C1 --> C2[Create Truck\nstatus: AVAILABLE]
-    C2 --> C3[Publish truck.status.changed.v1\nreason: TRUCK_REGISTERED\noldStatus: null]
+    C1 --> C2[Create Truck\nstatus: AVAILABLE\nlocation: starting position]
+    C2 --> C3[Publish truck.registered.v1\nConsumed by: Reporting + Map UI]
+
+    UC4([GET /trucks])
+    UC4 --> D1[GetAllTrucks use case]
+    D1 --> D2[Return all trucks\nwith current location and status]
+    D2 --> D3[Map UI renders initial state\nFrom this point on updates via events]
 ```
+
+> **Note:** Map (UI) is responsible for truck rendering but NOT for truck registration. Registration is always done via `POST /trucks` on Transport. On registration, Map (UI) receives `truck.registered.v1` and paints the truck at its starting position. Map also calls `GET /trucks` on startup to render any trucks already registered before it started. After that, it stays updated exclusively via events: `truck.position.updated.v1` for movement and `delivery.completed.v1` for arrivals.
+
+---
+
+## REST Endpoints
+
+| Method | Path | Description | Consumer |
+|---|---|---|---|
+| `POST` | `/trucks` | Register a new truck | Internal / Admin |
+| `GET` | `/trucks` | Get all trucks with current location and status | Map (UI) |
 
 ---
 
@@ -153,7 +169,8 @@ flowchart TD
 
 | Event | Trigger | Consumed by |
 |---|---|---|
-| truck.status.changed.v1 | Register, dispatch, load updated, delivery, return | Reporting |
+| truck.registered.v1 | Truck registration via POST /trucks | Reporting, Map (UI) |
+| truck.status.changed.v1 | Dispatch, load updated, delivery, return | Reporting |
 | truck.position.updated.v1 | Each tick while IN_TRANSIT | Map (UI), Reporting |
 | delivery.completed.v1 | Truck arrives at a delivery destination | Warehouses, Reporting, Map (UI) |
 
@@ -164,7 +181,6 @@ flowchart TD
 | Event | Emitted by | Use case triggered |
 |---|---|---|
 | shipment.requested.v1 | Warehouses / Factories | AssignTruck |
-| simulation.time.tick | Ruben (Simulation) | AdvanceTrucks |
+| time.advanced.v1 | Ruben (Simulation) | AdvanceTrucks |
 
 ---
-
