@@ -194,7 +194,7 @@ flowchart TD
 | Event | Consumed by | Type |
 |---|---|---|
 | recipe.registered.v1 | Reporting | Factory |
-| production.materials.requested.v1 | Warehouse |
+| production.materials.requested.v1 | Warehouse | MaterialsRequested |
 | production.order.completed.v1 | Warehouse, Reporting | WarehouseOrder |
 | production.order.created.v1 | Reporting | ProductionOrder |
 | production.order.started.v1 | Reporting | ProductionOrder |
@@ -204,6 +204,6 @@ flowchart TD
 
 | Event | Received by | Type |
 |---|---|---|
-| time.advanced.v1 | Time | |
-| delivery.completed.v1 | Warehouse | |
-| replenishment.requested.v1 | Warehouse | |
+| time.advanced.v1 | Time |  |
+| delivery.completed.v1 | Warehouse | boolean |
+| replenishment.requested.v1 | Warehouse | ReplenishRequest |
