@@ -88,11 +88,23 @@ classDiagram
         <<value object>>
         +UUID id
     }
+    class MaterialRequest {
+        <<entity>>
+        +MaterialRequestId id
+        +List~RecipeIngredients~ itemsRequest
+    }
+    class MaterialRequestId {
+        <<value object>>
+        +UUID id
+    }
     
     Recipe --> RecipeId
     Recipe --> RecipeIngredient : contains
     RecipeIngredient --> IngredientId
     Ingredient --> IngredientId
+    MaterialRequest --> MaterialRequestId
+    MaterialRequest --> RecipeIngredient
+    
     %% =======================
     %% WAREHOUSE ORDER AGGREGATE
     %% =======================
@@ -119,6 +131,7 @@ classDiagram
     
     WarehouseOrder --> WarehouseOrderStatus
     WarehouseOrder --> WarehouseOrderId
+
     %% =======================
     %% PRODUCT
     %% =======================
