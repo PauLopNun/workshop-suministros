@@ -37,6 +37,8 @@ classDiagram
 ```mermaid
 classDiagram
     class MapState {
+        List<TruckPosition> trucks
+        List<WarehousePosition> warehouses
         <<aggregate root>>
         +updateTruckPosition(TruckPosition, TruckId)
         +registerWarehouse(warehouseId, name, location)
@@ -49,10 +51,10 @@ classDiagram
 
     class WarehousePosition {
         <<value object>>
-        +UUID id
+        +UUID warehouseId
         +String name
         +Location location
-        +Type type
+        +WarehouseType type
     }
     class Location {
         <<value object>>
@@ -87,4 +89,3 @@ flowchart TD
 | **Production** | `time.advanced.v1` | `None` | Production uses the time advance event to progress production orders. |
 | **Warehouse** | `time.advanced.v1` | `warehouse.registered.v1 (WarehouseLocation)`<br>`warehouse.updated.v1 (WarehouseLocation)` *(optional)* | Warehouse may use the time advance event to check stock, consumption or replenishment needs. Time + Map uses Warehouse events to display warehouses on the map. |
 | **Reporting** | `time.advanced.v1` | `None` | Reporting records time advances for history, monitoring and statistics. |
-
