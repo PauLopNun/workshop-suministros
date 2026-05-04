@@ -20,7 +20,7 @@ classDiagram
     }
     class FactoryId {
         <<value object>>
-        +String id
+        +UUID id
     }
     class Location {
         <<value object>>
@@ -30,7 +30,6 @@ classDiagram
     
     Factory --> FactoryId
     Factory --> Location
-
     %% =======================
     %% PRODUCTION ORDER AGGREGATE
     %% =======================
@@ -42,20 +41,13 @@ classDiagram
         +WarehouseOrderId warehouseOrderId
         +OrderStatus status
         +int remainingDays
-        +List~OrderLine~ lines
         +advance(days) DomainEvent
         +isCompleted() boolean
         +start()
     }
     class OrderId {
         <<value object>>
-        +String id
-    }
-    class OrderLine {
-        <<entity>>
-        +ProductId productId
-        +int quantity
-        +boolean consumed
+        +UUID id
     }
     class OrderStatus {
         <<value object>>
@@ -67,10 +59,8 @@ classDiagram
     
     ProductionOrder --> OrderId
     ProductionOrder --> OrderStatus
-    ProductionOrder --> OrderLine
-
     %% =======================
-    %% RECIPE & INGREDIENT AGGREGATES
+    %% RECIPE & INGREDIENT
     %% =======================
     class Recipe {
         <<aggregate root>>
@@ -86,24 +76,23 @@ classDiagram
         +int quantity
     }
     class Ingredient {
-        <<aggregate root>>
+        <<entity>>
         +IngredientId id
         +String name
     }
     class IngredientId {
         <<value object>>
-        +String id
+        +UUID id
     }
     class RecipeId {
         <<value object>>
-        +String id
+        +UUID id
     }
     
     Recipe --> RecipeId
     Recipe --> RecipeIngredient : contains
     RecipeIngredient --> IngredientId
     Ingredient --> IngredientId
-
     %% =======================
     %% WAREHOUSE ORDER AGGREGATE
     %% =======================
@@ -119,24 +108,22 @@ classDiagram
     }
     class WarehouseOrderId {
         <<value object>>
-        +String id
+        +UUID id
     }
     class WarehouseOrderStatus {
         <<value object>>
         PENDING
         IN_PRODUCTION
-        SHIPPED
         COMPLETED
     }
     
     WarehouseOrder --> WarehouseOrderStatus
     WarehouseOrder --> WarehouseOrderId
-
     %% =======================
-    %% PRODUCT AGGREGATE
+    %% PRODUCT
     %% =======================
     class Product {
-        <<aggregate root>>
+        <<entity>>
         +ProductId id
         +String name
         +String description
@@ -144,11 +131,10 @@ classDiagram
     }
     class ProductId {
         <<value object>>
-        +String id
+        +UUID id
     }
     
     Product --> ProductId
-
     %% =======================
     %% CROSS-AGGREGATE RELATIONSHIPS
     %% =======================
