@@ -158,8 +158,9 @@ classDiagram
     WarehouseOrder ..> ProductId : requests
 ```
 
-## Events Schema
+## Schemas
 
+### REST
 ```mermaid
 flowchart TD
     UC1([POST /factories]) --> A1[RegisterFactory]
@@ -170,6 +171,11 @@ flowchart TD
     C1 --> C2[Asks for materials to Warehouse\nPublishes production.materials.requested.v1]
     UC4([GET /recipes]) --> D1[GetAllRecipes]
     D1 --> D2[Gets all recipes so warehouses can see if the factory can produce what they need]
+```
+
+### Queues
+```mermaid
+flowchart TD
     UC5([time.advanced.v1 received]) --> E1[AdvanceProductionOrders]
     E1 --> E2[Decrements remainingDays for each IN_PROGRESS order]
     E2 --> E3{remainingDays == 0?}
