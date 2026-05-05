@@ -167,16 +167,16 @@ flowchart TD
     UC2([POST /recipes]) --> B1[RegisterRecipe]
     B1 --> B2[Creates and persists a Recipe\nwith ingredients and output product\nPublished recipe.registered.v1]
     UC3([POST /warehouses/id/orders]) --> C1[PlaceWarehouseOrder]
-    C1 --> C2[Creates ProductionOrder\nPublishes production.materials.requested.v1]
-    UC4([time.advanced.v1 received]) --> D1[AdvanceProductionOrders]
-    D1 --> D2[Decrements remainingDays for each IN_PROGRESS order]
-    D2 --> D3{remainingDays == 0?}
-    D3 -->|YES| D4[Publishes production.order.completed.v1\nPublishes dispatch.requested.v1]
-    UC5([delivery.completed.v1 received]) --> E1[HandleMaterialsArrived]
-    E1 --> E2[Publishes production.order.started.v1]
-    UC6([replenishment.requested.v1 received]) --> F1[CheckIfProductionCanStart]
-    UC7([GET /recipes]) --> G1[GetAllRecipes]
-    G1 --> G2[Gets all recipes so warehouses can see if the factory can produce what they need]
+    C1 --> C2[Asks for materials to Warehouse\nPublishes production.materials.requested.v1]
+    UC4([GET /recipes]) --> D1[GetAllRecipes]
+    D1 --> D2[Gets all recipes so warehouses can see if the factory can produce what they need]
+    UC5([time.advanced.v1 received]) --> E1[AdvanceProductionOrders]
+    E1 --> E2[Decrements remainingDays for each IN_PROGRESS order]
+    E2 --> E3{remainingDays == 0?}
+    E3 -->|YES| E4[Publishes production.order.completed.v1]
+    UC6([delivery.completed.v1 received]) --> F1[HandleMaterialsArrived]
+    F1 --> F2[Publishes production.order.started.v1]
+    UC7([replenishment.requested.v1 received]) --> G1[CheckIfProductionCanStart]
 ```
 
 ## Use case
