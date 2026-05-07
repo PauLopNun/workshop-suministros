@@ -31,21 +31,21 @@ Distributed system that simulates a supply chain between factories, warehouses a
 
 ```mermaid
 flowchart TD
-    S1([Store places order\nREST POST /stores/{id}/orders]) --> S2
+    S1([Store places order\nREST POST /stores/:id/orders]) --> S2
     S2[Production creates order\nand finds recipe] --> S3
     S3[Production publishes\nproduction.materials.requested.v1] --> S4
     S4{Warehouse can reserve\nfinished product?}
     S4 -->|YES| SP
     S4 -->|NO| S5
-    SP[Warehouse publishes\nshipment.requested.v1\nWarehouse -> Store] --> T1
+    SP[Warehouse publishes\nshipment.requested.v1\nWarehouse to Store] --> T1
     S5{Warehouse can reserve\nrecipe materials?}
     S5 -->|YES| SM
     S5 -->|NO| S6
-    SM[Warehouse publishes\nshipment.requested.v1\nWarehouse -> Factory] --> T2
+    SM[Warehouse publishes\nshipment.requested.v1\nWarehouse to Factory] --> T2
     S6{Supplier warehouse\nhas stock?}
     S6 -->|YES| SS
     S6 -->|NO| BLK
-    SS[Warehouse publishes\nshipment.requested.v1\nSupplier -> Factory] --> T2
+    SS[Warehouse publishes\nshipment.requested.v1\nSupplier to Factory] --> T2
     T2[Transport publishes\ndelivery.completed.v1\nmaterials arrived] --> P1
     P1[Production starts manufacturing\nproduction.order.started.v1] --> P2
     P2([REST POST /tick]) --> TIME
