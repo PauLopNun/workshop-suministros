@@ -25,7 +25,9 @@ Distributed system that simulates a supply chain between factories, warehouses a
 
 ## Context Map
 
-![Context Map](context-map.png)
+![Context Map](context-map.drawio.svg)
+
+Editable source: [context-map.drawio.svg](context-map.drawio.svg). Open it with draw.io to review or export a PNG.
 
 ## Main flow - UC-05: Store orders 3 tables
 
@@ -89,6 +91,55 @@ Current contract gaps to align before implementation:
 - Warehouse should publish an explicit result for `production.materials.requested.v1`, for example `warehouse.materials.reserved.v1`. `warehouse.stock.changed.v1` is useful for projections, but it is too generic as a workflow response.
 - Transport currently documents and configures `shipment.requested.v1`, but its listener adapter is still empty in `transport-service`.
 - Reporting should consume `truck.status.changed.v1` instead of the older `truck.assigned.v1` / `delivery.created.v1` names.
+
+## Verified Integration Map
+
+This view is based on the linked service repositories as of the documentation update. Solid arrows are implemented in code or explicitly configured; dashed arrows are intended contracts or gaps that need alignment.
+
+```mermaid
+flowchart LR
+    UI[User or UI]
+    SIM[Simulation\nTime + Map]
+    PROD[Production\nFactories + Recipes]
+    WH[Warehouse]
+    TR[Transport\nTrucks]
+    REP[Reporting]
+
+    UI -->|REST POST /tick| SIM
+    UI -->|REST GET /map| SIM
+    UI -->|REST POST /factories\nPOST /recipes\nPOST /warehouses/:warehouseId/orders| PROD
+    UI -->|REST POST /trucks\nGET /trucks| TR
+
+    SIM -->|time.advanced.v1| PROD
+    SIM -->|time.advanced.v1| TR
+    SIM -->|time.advanced.v1| REP
+
+    PROD -->|production.materials.requested.v1| WH
+    PROD -->|factory.registered.v1\nrecipe.registered.v1\nproduction.order.*.v1| REP
+    PROD -->|production.order.completed.v1| WH
+
+    WH -.->|shipment.requested.v1\nintended, infra pending| TR
+    WH -.->|warehouse.registered.v1\nintended, infra pending| SIM
+    WH -.->|replenishment.requested.v1\nintended, infra pending| PROD
+    WH -.->|warehouse.stock.changed.v1\nintended, infra pending| REP
+
+    TR -->|truck.registered.v1\ntruck.position.updated.v1| SIM
+    TR -->|truck.status.changed.v1\ndelivery.completed.v1| REP
+    TR -->|delivery.completed.v1| WH
+    TR -->|delivery.completed.v1| PROD
+
+    style WH fill:#fff9c4,stroke:#f9a825
+    style REP fill:#f5f5f5,stroke:#777
+```
+
+Repository check summary:
+
+| Service repo | Implemented REST | Implemented messaging | Notes |
+|---|---|---|---|
+| `fraarrmat11/MS-SIMULATION` | `POST /tick`, `GET /map` | Publishes `time.advanced.v1`; consumes `truck.registered.v1`, `truck.position.updated.v1`, `warehouse.registered.v1` | Publishes with routing key only; consumers use queues named like the events. |
+| `Fepe7/Factory-Workshop-Gft` | `POST /factories`, `GET /factories/{productId}`, `POST /recipes`, `GET /recipes`, `POST /warehouses/{warehouseId}/orders` | Publishes to `production.events`; consumes `production.time.advanced`, `production.delivery.completed`, `production.replenishment.requested` | Mentions `dispatch.requested.v1` in docs, but code does not publish it. |
+| `Esmeralda6/Warehouse-Workshop` | Not implemented yet | Not implemented yet | Current repo is domain-focused; infra contracts remain intended design. |
+| `PauLopNun/transport-service` | `POST /trucks`, `GET /trucks` | Publishes truck/delivery events; configures `shipment.requested.v1` and `time.advanced.v1` consumers | `DispatchRequestedListener` is currently empty, so shipment consumption is not end-to-end yet. |
 
 ## Dependency Rule
 
