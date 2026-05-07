@@ -1,6 +1,6 @@
-# Messaging Contracts — Transport Service
+# Messaging Contracts - Transport Service
 
-**Supply Chain Workshop | GFT | April 2026**  
+**Supply Chain Workshop | GFT | May 2026**
 MVP Version | without BREAKDOWN
 
 ---
@@ -11,11 +11,26 @@ MVP Version | without BREAKDOWN
 |---|---|
 | `[+]` | Field added on top of the original design |
 | `[-] MVP` | Removed in this version, to be recovered when BREAKDOWN is implemented |
-| **Value Object** | No own identity (no ID). Identified solely by its attribute values. |
+| **Value Object** | No own identity. Identified solely by its attribute values. |
 
 ---
 
-## PUBLISHED Contracts
+## RabbitMQ Topology
+
+Transport declares the exchanges and its own input queues. Consumer services must declare their own queues and bindings.
+
+| Exchange | Routing key | Direction | Transport queue |
+|---|---|---|---|
+| `trucks.exchange` | `truck.registered.v1` | Publishes | N/A |
+| `trucks.exchange` | `truck.status.changed.v1` | Publishes | N/A |
+| `trucks.exchange` | `truck.position.updated.v1` | Publishes | N/A |
+| `shipments.exchange` | `delivery.completed.v1` | Publishes | N/A |
+| `shipments.exchange` | `shipment.requested.v1` | Consumes | `trucks.shipment.requested` |
+| `simulation.exchange` | `time.advanced.v1` | Consumes | `trucks.time.advanced` |
+
+---
+
+## Published Contracts
 
 The Transport Service emits these events to RabbitMQ.
 
@@ -23,27 +38,115 @@ The Transport Service emits these events to RabbitMQ.
 
 ### `truck.registered.v1`
 
-Emitted when a new truck is registered via `POST /trucks`. Explicit registration event — Reporting listens to this to know a new truck has entered the fleet.
+Emitted when a new truck is registered via `POST /trucks`.
 
 | Field | Type | Notes |
 |---|---|---|
 | `truckId` | String (UUID) | Identifier of the new truck |
 | `name` | String | Display name of the truck |
-| `position` | Value Object | Starting position on the grid |
-| `position.x` | Number | X coordinate |
-| `position.y` | Number | Y coordinate |
-| `capacity` | Integer | Maximum number of DeliveryItems the truck can carry |
-| `timestamp` | Integer | Simulation day of registration |
+| `location` | Value Object | Starting position on the grid |
+| `location.x` | Integer | X coordinate |
+| `location.y` | Integer | Y coordinate |
+| `capacity` | Integer | Maximum number of items the truck can carry |
+| `timestamp` | Integer | Simulation day of registration. Current implementation emits `0` on REST registration |
 
-**Consumers:** Reporting | Map (UI)
+**Published on:** `trucks.exchange` with routing key `truck.registered.v1`
+**Consumers:** Reporting | Map UI
 
 ```json
 {
   "truckId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "name": "Truck 01",
-  "position": { "x": 0, "y": 0 },
+  "location": { "x": 0, "y": 0 },
   "capacity": 10,
-  "timestamp": 1
+  "timestamp": 0
+}
+```
+
+---
+
+### `truck.status.changed.v1`
+
+Notifies a change in a truck's operational status or load.
+
+| Field | Type | Notes |
+|---|---|---|
+| `truckId` | String (UUID) | Truck whose status has changed |
+| `oldStatus` | Enum/null | Previous status: `AVAILABLE` \| `IN_TRANSIT` \| `DELIVERED`. `null` on initial registration |
+| `newStatus` | Enum | New status: `AVAILABLE` \| `IN_TRANSIT` \| `DELIVERED` |
+| `position` | Value Object | Position at the moment of the change |
+| `position.x` | Integer | X coordinate |
+| `position.y` | Integer | Y coordinate |
+| `currentLoad` | Integer | Number of items the truck is currently carrying |
+| `capacity` | Integer | Maximum number of items the truck can carry |
+| `timestamp` | Integer | Simulation day of the status change |
+| `reason` | String | Change context for Reporting |
+| `reasonCode` | Enum | `[-] MVP` - typed enum to be implemented with BREAKDOWN |
+
+**Published on:** `trucks.exchange` with routing key `truck.status.changed.v1`
+**Consumers:** Reporting
+
+**Current reasons:** `TRUCK_REGISTERED`, `DISPATCHED`, `LOAD_UPDATED`, `RETURNED_TO_BASE`
+
+The current implementation does not publish a `DELIVERED` transition. When the last delivery is completed, the truck moves directly from `IN_TRANSIT` to `AVAILABLE` with `reason: RETURNED_TO_BASE`.
+
+Example - initial registration:
+
+```json
+{
+  "truckId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "oldStatus": null,
+  "newStatus": "AVAILABLE",
+  "position": { "x": 0, "y": 0 },
+  "currentLoad": 0,
+  "capacity": 10,
+  "timestamp": 0,
+  "reason": "TRUCK_REGISTERED"
+}
+```
+
+Example - dispatch to shipment:
+
+```json
+{
+  "truckId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "oldStatus": "AVAILABLE",
+  "newStatus": "IN_TRANSIT",
+  "position": { "x": 0, "y": 0 },
+  "currentLoad": 6,
+  "capacity": 10,
+  "timestamp": 3,
+  "reason": "DISPATCHED"
+}
+```
+
+Example - additional load or remaining load update:
+
+```json
+{
+  "truckId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "oldStatus": "IN_TRANSIT",
+  "newStatus": "IN_TRANSIT",
+  "position": { "x": 3, "y": 2 },
+  "currentLoad": 9,
+  "capacity": 10,
+  "timestamp": 4,
+  "reason": "LOAD_UPDATED"
+}
+```
+
+Example - all deliveries completed:
+
+```json
+{
+  "truckId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "oldStatus": "IN_TRANSIT",
+  "newStatus": "AVAILABLE",
+  "position": { "x": 8, "y": 2 },
+  "currentLoad": 0,
+  "capacity": 10,
+  "timestamp": 7,
+  "reason": "RETURNED_TO_BASE"
 }
 ```
 
@@ -51,16 +154,17 @@ Emitted when a new truck is registered via `POST /trucks`. Explicit registration
 
 ### `truck.position.updated.v1`
 
-Real-time truck position. Designed for high frequency: carries no business data to avoid saturating the network.
+Truck movement event. It carries only map position data.
 
 | Field | Type | Notes |
 |---|---|---|
 | `truckId` | String (UUID) | Identifies the truck to move on the map |
-| `location` | Value Object | Value Object: no ID. Identified by its coordinates |
-| `location.x` | Number | X coordinate on the grid |
-| `location.y` | Number | Y coordinate on the grid |
+| `location` | Value Object | Current position |
+| `location.x` | Integer | X coordinate on the grid |
+| `location.y` | Integer | Y coordinate on the grid |
 
-**Consumers:** Map (UI) | Reporting
+**Published on:** `trucks.exchange` with routing key `truck.position.updated.v1`
+**Consumers:** Map UI | Reporting
 
 ```json
 {
@@ -73,25 +177,22 @@ Real-time truck position. Designed for high frequency: carries no business data 
 
 ### `delivery.completed.v1`
 
-Confirms that a truck has completed a delivery at a destination warehouse.
+Confirms that a truck completed a delivery at its destination.
 
 | Field | Type | Notes |
 |---|---|---|
-| `shipmentId` | String (UUID) | Order ID. Used by the receiver to mark the delivery as received |
-| `truckId` | String (UUID) | `[+]` Identifies the truck that completed the delivery. Used by Map (UI) to remove or update the truck icon |
-| `items[]` | Array of Value Objects | Value Object: no ID. Identified by their attributes |
-| `items[].materialType` | String | Type of material delivered (agree naming with the team) |
-| `items[].quantity` | Number | Quantity delivered |
-| `location` | Value Object | Value Object: no ID. Identified by its coordinates |
-| `location.x` | Number | X coordinate of the destination |
-| `location.y` | Number | Y coordinate of the destination |
-| `completedAt` | Integer | `[+]` Simulation day on which the delivery was completed. Required to calculate transit times in Reporting |
+| `shipmentId` | String (UUID) | Correlates the completed delivery with the original shipment request |
+| `truckId` | String (UUID) | Truck that completed the delivery |
+| `items[]` | Array of Value Objects | Delivered items |
+| `items[].materialType` | String | Type of material delivered |
+| `items[].quantity` | Integer | Quantity delivered |
+| `location` | Value Object | Destination location |
+| `location.x` | Integer | X coordinate of the destination |
+| `location.y` | Integer | Y coordinate of the destination |
+| `completedAt` | Integer | Simulation day on which the delivery was completed |
 
-**Consumers:** Warehouses | Reporting | Map (UI)
-
-> The `location` field is exclusively for Reporting (log verification and traceability). Warehouses can ignore it — they already know their own location.
->
-> Map (UI) only needs `truckId` from this event — to remove or update the truck icon when the delivery is completed. All other fields can be ignored by Map (UI).
+**Published on:** `shipments.exchange` with routing key `delivery.completed.v1`
+**Consumers:** Warehouses | Reporting | Map UI
 
 ```json
 {
@@ -108,105 +209,59 @@ Confirms that a truck has completed a delivery at a destination warehouse.
 
 ---
 
-### `truck.status.changed.v1`
-
-Notifies a change in a truck's operational status. Allows Reporting to trace the complete lifecycle after registration.
-
-| Field | Type | Notes |
-|---|---|---|
-| `truckId` | String (UUID) | Truck whose status has changed |
-| `oldStatus` | Enum | Previous status: `AVAILABLE` \| `IN_TRANSIT` \| `DELIVERED` |
-| `newStatus` | Enum | New status: `AVAILABLE` \| `IN_TRANSIT` \| `DELIVERED` |
-| `position` | Value Object | Value Object: no ID. Identified by its coordinates |
-| `position.x` | Number | X coordinate at the moment of the change |
-| `position.y` | Number | Y coordinate at the moment of the change |
-| `currentLoad` | Integer | `[+]` Number of DeliveryItems the truck is currently carrying |
-| `capacity` | Integer | `[+]` Maximum number of DeliveryItems the truck can carry |
-| `timestamp` | Integer | Simulation day of the status change |
-| `reason` | String | Change context for Reporting. E.g.: `DISPATCHED`, `LOAD_UPDATED`, `RETURNED_TO_BASE` |
-| `reasonCode` | Enum | `[-] MVP` — Typed enum to be implemented with BREAKDOWN |
-
-**Consumers:** Reporting
-
-**Status cycle:** `AVAILABLE` -> `IN_TRANSIT` -> `DELIVERED` -> `AVAILABLE`
-
-**Multi-delivery:** When a truck already `IN_TRANSIT` accepts an additional shipment on its route and within capacity, this event is published with `reason: LOAD_UPDATED` and the status unchanged (`IN_TRANSIT`). When a truck completes one delivery but still carries others, it also publishes `reason: LOAD_UPDATED` with the updated `currentLoad`.
-
-Example — dispatch to shipment:
-
-```json
-{
-  "truckId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "oldStatus": "AVAILABLE",
-  "newStatus": "IN_TRANSIT",
-  "position": { "x": 0, "y": 0 },
-  "currentLoad": 6,
-  "capacity": 10,
-  "timestamp": 3,
-  "reason": "DISPATCHED"
-}
-```
-
-Example — additional load picked up while in transit:
-
-```json
-{
-  "truckId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "oldStatus": "IN_TRANSIT",
-  "newStatus": "IN_TRANSIT",
-  "position": { "x": 3, "y": 2 },
-  "currentLoad": 9,
-  "capacity": 10,
-  "timestamp": 4,
-  "reason": "LOAD_UPDATED"
-}
-```
-
-Example — truck returns to base after all deliveries:
-
-```json
-{
-  "truckId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "oldStatus": "IN_TRANSIT",
-  "newStatus": "AVAILABLE",
-  "position": { "x": 0, "y": 0 },
-  "currentLoad": 0,
-  "capacity": 10,
-  "timestamp": 7,
-  "reason": "RETURNED_TO_BASE"
-}
-```
-
----
-
 ## REST Endpoints
 
 ---
 
 ### `POST /trucks`
 
-Registers a new truck in the fleet. Publishes `truck.registered.v1` after creation.
+Registers a new truck in the fleet.
 
-**Consumers:** Internal / Admin
+**Side effects:** Publishes `truck.registered.v1` and `truck.status.changed.v1` with `reason: TRUCK_REGISTERED`.
+
+Request:
+
+| Field | Type | Notes |
+|---|---|---|
+| `name` | String | Required, non-blank |
+| `x` | Integer | Starting X coordinate |
+| `y` | Integer | Starting Y coordinate |
+| `capacity` | Integer | Required, minimum `1` |
+
+```json
+{
+  "name": "Truck 01",
+  "x": 0,
+  "y": 0,
+  "capacity": 10
+}
+```
+
+Response `201`:
+
+```json
+{
+  "truckId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "name": "Truck 01",
+  "location": { "x": 0, "y": 0 },
+  "status": "AVAILABLE"
+}
+```
 
 ---
 
 ### `GET /trucks`
 
-Returns the full list of registered trucks with their current position and status. Designed for Map (UI) to fetch the initial state on startup — before any events are received.
+Returns the full list of registered trucks with current position and status. Map UI uses it on startup before receiving live events.
 
 | Field | Type | Notes |
 |---|---|---|
 | `truckId` | String (UUID) | Truck identifier |
 | `name` | String | Truck display name |
 | `location` | Value Object | Current position on the grid |
-| `location.x` | Number | X coordinate |
-| `location.y` | Number | Y coordinate |
+| `location.x` | Integer | X coordinate |
+| `location.y` | Integer | Y coordinate |
 | `status` | Enum | Current status: `AVAILABLE` \| `IN_TRANSIT` \| `DELIVERED` |
-
-**Consumers:** Map (UI)
-
-> Map (UI) calls this endpoint on startup to render the initial truck positions. From that point on, it stays updated via `truck.position.updated.v1` (movement) and `delivery.completed.v1` (arrival).
 
 ```json
 [
@@ -215,67 +270,69 @@ Returns the full list of registered trucks with their current position and statu
     "name": "Truck 01",
     "location": { "x": 3, "y": 5 },
     "status": "IN_TRANSIT"
-  },
-  {
-    "truckId": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
-    "name": "Truck 02",
-    "location": { "x": 0, "y": 0 },
-    "status": "AVAILABLE"
   }
 ]
 ```
 
 ---
 
-## CONSUMED Contracts
+## Consumed Contracts
 
-The Transport Service listens to these events from RabbitMQ.
+The Transport Service owns queues for these RabbitMQ events.
 
 ---
 
 ### `time.advanced.v1`
 
-System time engine. The Simulation service sends the current day as an integer. The Transport service calculates internally how many days have advanced by comparing against the last received day.
+System time event. The current implementation ignores unknown fields, skips messages with `daysAdvanced <= 0`, and advances trucks by one grid step per simulated day.
 
 | Field | Type | Notes |
 |---|---|---|
-| `currentDay` | Integer | Current simulation day. Starts at 1 on the first tick |
+| `previousDayNumber` | Integer | Previous simulation day |
+| `currentDayNumber` | Integer | Current simulation day. Used as `completedAt` and status-change timestamp |
+| `daysAdvanced` | Integer | Number of days to process |
 
-**Emitter:** Ruben (Simulation Service)
-
-**Action:** Calculate `daysAdvanced = currentDay - lastDay`. For each `IN_TRANSIT` truck apply: `P_new = P_current + (speed * daysAdvanced * direction)`
+**Consumed from:** `simulation.exchange` with routing key `time.advanced.v1` through queue `trucks.time.advanced`
+**Emitter:** Simulation Service
 
 ```json
 {
-  "currentDay": 3
+  "previousDayNumber": 2,
+  "currentDayNumber": 3,
+  "daysAdvanced": 1
 }
 ```
 
 ---
 
-### `shipment.requested.v1` [NEW]
+### `shipment.requested.v1`
 
-Request to transport materials between two points. This contract covers the identified gap: it triggers the internal logic that finds the optimal available truck and assigns it.
+Request to transport items between two grid points. The RabbitMQ binding exists in Transport, and the application use case expects this data shape. The current `DispatchRequestedListener` source file is still empty, so the listener adapter needs implementation before the event is processed end to end.
 
 | Field | Type | Notes |
 |---|---|---|
 | `shipmentId` | String (UUID) | Allows correlation with `delivery.completed.v1` |
-| `originId` | String | ID of the origin warehouse or factory |
-| `destinationId` | String | ID of the destination warehouse |
-| `items[]` | Array of Value Objects | Value Object: no ID. Identified by their attributes |
+| `origin` | Value Object | Pickup location |
+| `origin.x` | Integer | Origin X coordinate |
+| `origin.y` | Integer | Origin Y coordinate |
+| `destination` | Value Object | Delivery destination |
+| `destination.x` | Integer | Destination X coordinate |
+| `destination.y` | Integer | Destination Y coordinate |
+| `items[]` | Array of Value Objects | Items to transport |
 | `items[].materialType` | String | Type of material to transport |
-| `items[].quantity` | Number | Quantity to transport |
+| `items[].quantity` | Integer | Quantity to transport |
 | `requestedAt` | Integer | Simulation day on which the request was made |
 
+**Consumed from:** `shipments.exchange` with routing key `shipment.requested.v1` through queue `trucks.shipment.requested`
 **Emitter:** Warehouses / Factories
 
-**Action:** Find optimal available truck -> assign it -> mark `IN_TRANSIT` -> publish `truck.status.changed.v1`
+**Action:** Select the closest available truck with enough remaining capacity. If none is available, try an `IN_TRANSIT` truck that still has capacity. Create a `Delivery`, update truck load/status, and publish `truck.status.changed.v1`.
 
 ```json
 {
   "shipmentId": "c9d8e7f6-a5b4-3210-9876-543210fedcba",
-  "originId": "warehouse-north-01",
-  "destinationId": "warehouse-south-03",
+  "origin": { "x": 0, "y": 0 },
+  "destination": { "x": 8, "y": 2 },
   "items": [
     { "materialType": "wood", "quantity": 6 },
     { "materialType": "nails", "quantity": 12 }
@@ -288,22 +345,21 @@ Request to transport materials between two points. This contract covers the iden
 
 ## Summary
 
-| Event | Direction | Consumers / Emitter |
-|---|---|---|
-| `truck.registered.v1` | PUBLISHES | Reporting \| Map (UI) |
-| `truck.position.updated.v1` | PUBLISHES | Map (UI) \| Reporting |
-| `delivery.completed.v1` | PUBLISHES | Warehouses \| Reporting \| Map (UI) |
-| `truck.status.changed.v1` | PUBLISHES | Reporting |
-| `time.advanced.v1` | CONSUMES | Emitted by: Ruben (Simulation) |
-| `shipment.requested.v1` [NEW] | CONSUMES | Emitted by: Warehouses / Factories |
+| Event | Direction | Exchange | Consumers / Emitter |
+|---|---|---|---|
+| `truck.registered.v1` | Publishes | `trucks.exchange` | Reporting \| Map UI |
+| `truck.status.changed.v1` | Publishes | `trucks.exchange` | Reporting |
+| `truck.position.updated.v1` | Publishes | `trucks.exchange` | Map UI \| Reporting |
+| `delivery.completed.v1` | Publishes | `shipments.exchange` | Warehouses \| Reporting \| Map UI |
+| `time.advanced.v1` | Consumes | `simulation.exchange` | Emitted by Simulation |
+| `shipment.requested.v1` | Consumes | `shipments.exchange` | Emitted by Warehouses / Factories |
 
 ---
 
 ## Note on Value Objects
 
-The `items[]` fields in `delivery.completed.v1` and `shipment.requested.v1` are arrays of Value Objects, not entities. This means:
+The `location`, `origin`, `destination`, `position`, and `items[]` fields are Value Objects:
 
-- They carry no ID field (no `itemId`). They are identified by the value of their attributes.
-- They are immutable: they are copied in full in each message and never referenced by ID.
-- The structure is: `{ materialType: String, quantity: Number }`.
-- The field name `materialType` must be agreed upon with the rest of the team so that all services use the same material naming convention.
+- They carry no ID field.
+- They are copied in full in each message and are not referenced by ID.
+- `items[]` structure is `{ "materialType": String, "quantity": Integer }`.

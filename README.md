@@ -2,52 +2,95 @@
 
 Distributed system that simulates a supply chain between factories, warehouses and stores.
 
+## Project Links
+
+| Area | Link |
+|---|---|
+| General repository | [PauLopNun/supply-chain-simulator-workshop](https://github.com/PauLopNun/supply-chain-simulator-workshop.git) |
+| Trello board | [Trello](trello) |
+| Simulation - Time + Map | [fraarrmat11/MS-SIMULATION](https://github.com/fraarrmat11/MS-SIMULATION) |
+| Factories / Production | [Fepe7/Factory-Workshop-Gft](https://github.com/Fepe7/Factory-Workshop-Gft) |
+| Warehouses | [Esmeralda6/Warehouse-Workshop](https://github.com/Esmeralda6/Warehouse-Workshop) |
+| Trucks / Transport | [PauLopNun/transport-service](https://github.com/PauLopNun/transport-service) |
+
 ## Teams
 
 | Service | Team member | Role |
 |---|---|---|
-| Time Passage + Map | Rubén | Open Host Service — upstream of all |
-| Factories + Recipes | Idoia | Customer/Supplier — downstream of Time |
-| Warehouses | Pau | Core Domain — central node |
-| Trucks | Sergi | Conformist — downstream of Almacenes |
-| Reports | Pedro | Anticorruption Layer — downstream of all |
+| Time Passage + Map | Ruben | Open Host Service - upstream of all |
+| Factories + Recipes | Idoia | Customer/Supplier - downstream of Time |
+| Warehouses | Pau | Core Domain - central node |
+| Trucks | Sergi | Conformist - downstream of Warehouses |
+| Reports | Pedro | Anticorruption Layer - downstream of all |
 
 ## Context Map
 
 ![Context Map](context-map.png)
 
-## Main flow — UC-05: Store orders 3 tables
+## Main flow - UC-05: Store orders 3 tables
 
 ```mermaid
 flowchart TD
-    S1([Store places order\nPOST /stores/id/orders]) --> S2
-    S2[Production receives order\nand finds the recipe] --> S3
-    S3{Are there tables\nin Warehouse?}
-    S3 -->|YES| SC
-    S3 -->|NO| S4
-    SC[Truck delivers tables\ndirectly to Store] --> END
-    S4{Are there materials\nin Warehouse?}
-    S4 -->|YES| S5A
-    S4 -->|NO| S5B
-    S5A[Warehouse deducts materials\nStockAvailable to Production] --> S6
-    S5B[Warehouse finds\nsupplier warehouse] --> S5C
-    S5B -->|no supplier| BLK
-    S5C[tick: Truck brings materials\nto factory warehouse] --> S6
-    BLK([BLOCKED\nStockUnavailable to Reporting])
-    S6[Production manufactures\n3 tables\ntakes N days per recipe] --> S7
-    S7[tick: Tables ready\nTruck delivers to Store] --> END
-    END([tick: Store receives tables\nOrder COMPLETED])
+    S1([Store places order\nREST POST /stores/{id}/orders]) --> S2
+    S2[Production creates order\nand finds recipe] --> S3
+    S3[Production publishes\nproduction.materials.requested.v1] --> S4
+    S4{Warehouse can reserve\nfinished product?}
+    S4 -->|YES| SP
+    S4 -->|NO| S5
+    SP[Warehouse publishes\nshipment.requested.v1\nWarehouse -> Store] --> T1
+    S5{Warehouse can reserve\nrecipe materials?}
+    S5 -->|YES| SM
+    S5 -->|NO| S6
+    SM[Warehouse publishes\nshipment.requested.v1\nWarehouse -> Factory] --> T2
+    S6{Supplier warehouse\nhas stock?}
+    S6 -->|YES| SS
+    S6 -->|NO| BLK
+    SS[Warehouse publishes\nshipment.requested.v1\nSupplier -> Factory] --> T2
+    T2[Transport publishes\ndelivery.completed.v1\nmaterials arrived] --> P1
+    P1[Production starts manufacturing\nproduction.order.started.v1] --> P2
+    P2([REST POST /tick]) --> TIME
+    TIME[Simulation publishes\ntime.advanced.v1] --> P3
+    P3[Production advances order] --> P4
+    P4{Production completed?}
+    P4 -->|NO| P2
+    P4 -->|YES| P5[Production publishes\nproduction.order.completed.v1]
+    P5 --> SP
+    T1[Transport publishes\ntruck.position.updated.v1\nwhile moving] --> T3
+    T3[Transport publishes\ndelivery.completed.v1\nstore received goods] --> END
+    BLK([BLOCKED\nproduction.order.blocked.v1\nto Reporting])
+    END([Order COMPLETED])
 
-    style SC fill:#e8f5e9,stroke:#388e3c
     style END fill:#e8f5e9,stroke:#388e3c
     style BLK fill:#ffebee,stroke:#c62828
-    style S3 fill:#fff9c4,stroke:#f9a825
     style S4 fill:#fff9c4,stroke:#f9a825
+    style S5 fill:#fff9c4,stroke:#f9a825
+    style S6 fill:#fff9c4,stroke:#f9a825
+    style P4 fill:#fff9c4,stroke:#f9a825
 ```
 
-> tick = user clicks Advance Day
+> `POST /tick` is the user command. `time.advanced.v1` is the event that lets every service advance its own state.
 
-## Dependency rule (applies to all services)
+## REST vs Events
+
+Use REST for commands and queries where the caller needs an immediate acknowledgement or a current read model.
+
+| Case | Integration style | Examples |
+|---|---|---|
+| User/admin command | REST command | `POST /tick`, `POST /trucks`, `POST /factories`, `POST /recipes`, `POST /stores/{id}/orders` |
+| UI/read model bootstrap | REST query | `GET /map`, `GET /trucks`, `GET /recipes`, reporting dashboards |
+| Business fact that already happened | RabbitMQ event | `time.advanced.v1`, `truck.registered.v1`, `truck.position.updated.v1`, `delivery.completed.v1`, `production.order.completed.v1` |
+| Long-running cross-service workflow | RabbitMQ event/command message | `production.materials.requested.v1`, `shipment.requested.v1`, `replenishment.requested.v1` |
+| Audit/projections | RabbitMQ event fan-out | Reporting consumes events from all services |
+
+Avoid REST for cross-service state changes that start a long process, such as requesting a shipment or reacting to a time advance. Avoid queues for direct UI reads, such as loading the current map or truck list.
+
+Current contract gaps to align before implementation:
+
+- Warehouse should publish an explicit result for `production.materials.requested.v1`, for example `warehouse.materials.reserved.v1`. `warehouse.stock.changed.v1` is useful for projections, but it is too generic as a workflow response.
+- Transport currently documents and configures `shipment.requested.v1`, but its listener adapter is still empty in `transport-service`.
+- Reporting should consume `truck.status.changed.v1` instead of the older `truck.assigned.v1` / `delivery.created.v1` names.
+
+## Dependency Rule
 
 ```mermaid
 graph LR
@@ -60,7 +103,7 @@ graph LR
 
 `domain` never depends on JPA, RabbitMQ or any external framework.
 
-## Naming conventions
+## Naming Conventions
 
 ### Branches
 
@@ -87,8 +130,8 @@ Examples:
     chore: add liquibase migration for warehouse table
 
 > Both conventions are enforced automatically by the CI pipeline on every push and pull request.
-> 
-## Tech stack
+
+## Tech Stack
 
 - Java 21 + Spring Boot 3
 - PostgreSQL + Liquibase

@@ -1,7 +1,7 @@
-# Transport — Sergi
+# Transport - Sergi
 
-Manages the truck fleet and deliveries between warehouses.
-Moves trucks on each time tick and notifies when a delivery is completed.
+Manages the truck fleet and deliveries between supply-chain locations.
+It assigns trucks to shipment requests, advances trucks on simulation ticks, and publishes events for maps, reporting, and delivery receivers.
 
 ---
 
@@ -9,29 +9,28 @@ Moves trucks on each time tick and notifies when a delivery is completed.
 
 ### Module: truck
 
-Each truck is the aggregate root of this module. `Location` and `TruckStatus` are value objects accessed only through `Truck`. `OptimalTruckSelector` is a domain service that crosses both modules to find the best truck given an origin location.
+`Truck` is the aggregate root. It owns identity, current location, operational status, capacity, load, speed, and the list of assigned deliveries.
+
+`Location`, `TruckId`, and `TruckStatus` are value objects/enums accessed through `Truck`. `OptimalTruckSelector` is a domain service that selects the closest available truck with enough remaining capacity.
 
 ```mermaid
 classDiagram
     class Truck {
         <<aggregate root>>
-        +TruckId id
+        +TruckId truckId
         +String name
         +Location location
         +TruckStatus status
-        +int speed
         +int capacity
         +int currentLoad
+        +int speed
         +List~DeliveryId~ deliveryIds
-        +assignDelivery(deliveryId, itemCount) DomainEvent
-        +completeDelivery(deliveryId) DomainEvent
-        +hasCapacityFor(itemCount) boolean
-        +isAvailable() boolean
-        +isInTransit() boolean
+        +remainingCapacity() int
+        +canAccept(items) boolean
     }
     class TruckId {
         <<value object>>
-        +String value
+        +UUID value
     }
     class Location {
         <<value object>>
@@ -39,7 +38,7 @@ classDiagram
         +int y
     }
     class TruckStatus {
-        <<value object>>
+        <<enum>>
         AVAILABLE
         IN_TRANSIT
         DELIVERED
@@ -50,26 +49,31 @@ classDiagram
     Truck --> DeliveryId
 ```
 
+Current behavior uses `AVAILABLE` and `IN_TRANSIT`. `DELIVERED` exists in the enum and persistence model, but the current flow returns a truck directly to `AVAILABLE` after its last delivery is completed.
+
 ---
 
 ### Module: delivery
 
-`Delivery` is the aggregate root. `DeliveryItem` and `DeliveryId` are value objects accessed only through `Delivery`. `Location` is shared with the truck module. `DistanceCalculator` is a domain service.
+`Delivery` is the aggregate root for an assigned shipment. It links a `shipmentId` from the external request with the assigned `TruckId`, origin/destination, items, assignment day, and optional completion day.
+
+`DeliveryItem` and `DeliveryId` are value objects. `Location` and `TruckId` are shared with the truck module.
 
 ```mermaid
 classDiagram
     class Delivery {
         <<aggregate root>>
-        +DeliveryId id
+        +DeliveryId deliveryId
+        +UUID shipmentId
         +TruckId truckId
-        +String shipmentId
         +Location origin
         +Location destination
-        +int totalDays
-        +int remainingDays
         +List~DeliveryItem~ items
-        +advance(days) DomainEvent
-        +isArrived() boolean
+        +int assignedAt
+        +Integer completedAt
+        +isCompleted() boolean
+        +isArrived(truckLocation) boolean
+        +complete(completedAt) Delivery
     }
     class DeliveryItem {
         <<value object>>
@@ -78,10 +82,11 @@ classDiagram
     }
     class DeliveryId {
         <<value object>>
-        +String value
+        +UUID value
     }
     Delivery --> DeliveryId
     Delivery --> TruckId
+    Delivery --> Location
     Delivery "1" --> "*" DeliveryItem
 ```
 
@@ -93,66 +98,93 @@ classDiagram
 classDiagram
     class OptimalTruckSelector {
         <<domain service>>
-        +findBestTruck(origin, destination, itemCount, trucks) Truck
+        +select(trucks, origin, requiredItems) Truck
     }
     class DistanceCalculator {
         <<domain service>>
-        +calculate(a, b) int
+        +calculate(from, to) int
         +isOnRoute(point, from, to) boolean
     }
 ```
+
+`DistanceCalculator` uses Manhattan distance. Route checks assume movement on X first and then Y. `AdvanceTrucks` currently moves one grid unit per simulated day toward the first pending delivery for the truck.
 
 ---
 
 ## Use cases
 
-### UC1 — shipment.requested.v1 received → Assign truck
+### UC1 - `shipment.requested.v1` received -> Assign truck
 
 ```mermaid
 flowchart TD
     UC1([shipment.requested.v1 received])
-    UC1 --> A1[AssignTruck use case]
-    A1 --> A2[OptimalTruckSelector.findBestTruck\norigin / destination / itemCount / all trucks]
-    A2 --> A3{Truck found?}
-    A3 -->|NO| A9[No truck available — discard or retry]
-    A3 -->|YES AVAILABLE| A4[Create Delivery\nSet Truck status to IN_TRANSIT\nSet currentLoad = itemCount]
-    A3 -->|YES IN_TRANSIT passing by| A5[Create Delivery\nAdd to truck.deliveryIds\nUpdate currentLoad += itemCount]
-    A4 --> A6[Publish truck.status.changed.v1\nreason: DISPATCHED\ncurrentLoad / capacity]
-    A5 --> A7[Publish truck.status.changed.v1\nreason: LOAD_UPDATED\ncurrentLoad / capacity]
+    UC1 --> A0[Map message to AssignTruckCommand]
+    A0 --> A1[AssignTruck use case]
+    A1 --> A2[Calculate requiredItems as sum of item quantities]
+    A2 --> A3[OptimalTruckSelector.select closest AVAILABLE truck with capacity]
+    A3 --> A4{Truck found?}
+    A4 -->|NO| A5[Try IN_TRANSIT truck with remaining capacity]
+    A5 --> A6{Truck found?}
+    A6 -->|NO| A9[NoTruckAvailableException]
+    A4 -->|YES| A7[Create Delivery and set truck IN_TRANSIT]
+    A6 -->|YES| A8[Create Delivery and increase currentLoad]
+    A7 --> A10[Publish truck.status.changed.v1 reason DISPATCHED]
+    A8 --> A11[Publish truck.status.changed.v1 reason LOAD_UPDATED]
 ```
 
-### UC2 — time.advanced.v1 received → Advance trucks
+Implementation note: RabbitMQ binding for `shipment.requested.v1` exists, but `DispatchRequestedListener.java` is currently empty. The application use case is implemented; the messaging adapter still needs to map the event into `AssignTruckCommand`.
+
+---
+
+### UC2 - `time.advanced.v1` received -> Advance trucks
 
 ```mermaid
 flowchart TD
     UC2([time.advanced.v1 received])
-    UC2 --> B1[AdvanceTrucks use case]
-    B1 --> B2[Calculate daysAdvanced = currentDay - lastDay]
-    B2 --> B3[For each IN_TRANSIT Delivery: advance]
-    B3 --> B4{isArrived?}
-    B4 -->|YES| B5[Publish delivery.completed.v1\nUpdate truck currentLoad -= delivery.itemCount\nTruck.completeDelivery]
-    B5 --> B6{truck.deliveryIds empty?}
-    B6 -->|YES| B7[Set Truck to AVAILABLE\nPublish truck.status.changed.v1\nreason: RETURNED_TO_BASE\ncurrentLoad: 0]
-    B6 -->|NO| B8[Truck stays IN_TRANSIT\nPublish truck.status.changed.v1\nreason: LOAD_UPDATED\ncurrentLoad / capacity]
-    B4 -->|NO| B9[Publish truck.position.updated.v1]
+    UC2 --> B1{daysAdvanced > 0?}
+    B1 -->|NO| B0[Ignore message]
+    B1 -->|YES| B2[AdvanceTrucks use case]
+    B2 --> B3[Find IN_TRANSIT trucks]
+    B3 --> B4[For each simulated day, move one grid step toward first pending delivery]
+    B4 --> B5[Publish truck.position.updated.v1]
+    B5 --> B6{Arrived at delivery destination?}
+    B6 -->|NO| B4
+    B6 -->|YES| B7[Complete Delivery and publish delivery.completed.v1]
+    B7 --> B8{More pending deliveries for truck?}
+    B8 -->|YES| B9[Reduce currentLoad and publish truck.status.changed.v1 reason LOAD_UPDATED]
+    B8 -->|NO| B10[Set truck AVAILABLE, currentLoad 0 and publish truck.status.changed.v1 reason RETURNED_TO_BASE]
 ```
 
-### UC3 — Register truck (REST) + Initial state for Map (UI)
+`time.advanced.v1` payload currently contains `previousDayNumber`, `currentDayNumber`, and `daysAdvanced`. `currentDayNumber` is used as the completion/status timestamp.
+
+---
+
+### UC3 - Register truck through REST
 
 ```mermaid
 flowchart TD
     UC3([POST /trucks])
     UC3 --> C1[RegisterTruck use case]
-    C1 --> C2[Create Truck\nstatus: AVAILABLE\nlocation: starting position]
-    C2 --> C3[Publish truck.registered.v1\nConsumed by: Reporting + Map UI]
-
-    UC4([GET /trucks])
-    UC4 --> D1[GetAllTrucks use case]
-    D1 --> D2[Return all trucks\nwith current location and status]
-    D2 --> D3[Map UI renders initial state\nFrom this point on updates via events]
+    C1 --> C2[Create Truck with status AVAILABLE and currentLoad 0]
+    C2 --> C3[Persist truck]
+    C3 --> C4[Publish truck.registered.v1]
+    C4 --> C5[Publish truck.status.changed.v1 reason TRUCK_REGISTERED]
 ```
 
-> **Note:** Map (UI) is responsible for truck rendering but NOT for truck registration. Registration is always done via `POST /trucks` on Transport. On registration, Map (UI) receives `truck.registered.v1` and paints the truck at its starting position. Map also calls `GET /trucks` on startup to render any trucks already registered before it started. After that, it stays updated exclusively via events: `truck.position.updated.v1` for movement and `delivery.completed.v1` for arrivals.
+---
+
+### UC4 - Initial state for Map UI
+
+```mermaid
+flowchart TD
+    UC4([GET /trucks])
+    UC4 --> D1[GetTrucks use case]
+    D1 --> D2[Return all trucks with current location and status]
+    D2 --> D3[Map UI renders initial state]
+    D3 --> D4[Map UI continues with truck.position.updated.v1 and delivery.completed.v1]
+```
+
+Map UI is responsible for rendering trucks, not for registering them. Registration is done through `POST /trucks`.
 
 ---
 
@@ -160,27 +192,36 @@ flowchart TD
 
 | Method | Path | Description | Consumer |
 |---|---|---|---|
-| `POST` | `/trucks` | Register a new truck | Internal / Admin |
-| `GET` | `/trucks` | Get all trucks with current location and status | Map (UI) |
+| `POST` | `/trucks` | Register a truck. Publishes `truck.registered.v1` and `truck.status.changed.v1` | Internal / Admin |
+| `GET` | `/trucks` | Get all trucks with current location and status | Map UI |
 
 ---
 
 ## Events published
 
-| Event | Trigger | Consumed by |
-|---|---|---|
-| truck.registered.v1 | Truck registration via POST /trucks | Reporting, Map (UI) |
-| truck.status.changed.v1 | Dispatch, load updated, delivery, return | Reporting |
-| truck.position.updated.v1 | Each tick while IN_TRANSIT | Map (UI), Reporting |
-| delivery.completed.v1 | Truck arrives at a delivery destination | Warehouses, Reporting, Map (UI) |
+| Event | Exchange | Trigger | Consumed by |
+|---|---|---|---|
+| `truck.registered.v1` | `trucks.exchange` | Truck registration via `POST /trucks` | Reporting, Map UI |
+| `truck.status.changed.v1` | `trucks.exchange` | Registration, dispatch, load update, all deliveries completed | Reporting |
+| `truck.position.updated.v1` | `trucks.exchange` | Each simulated day while moving | Map UI, Reporting |
+| `delivery.completed.v1` | `shipments.exchange` | Truck arrives at a delivery destination | Warehouses, Reporting, Map UI |
 
 ---
 
 ## Events consumed
 
-| Event | Emitted by | Use case triggered |
-|---|---|---|
-| shipment.requested.v1 | Warehouses / Factories | AssignTruck |
-| time.advanced.v1 | Ruben (Simulation) | AdvanceTrucks |
+| Event | Exchange | Queue | Use case triggered |
+|---|---|---|---|
+| `shipment.requested.v1` | `shipments.exchange` | `trucks.shipment.requested` | AssignTruck |
+| `time.advanced.v1` | `simulation.exchange` | `trucks.time.advanced` | AdvanceTrucks |
 
 ---
+
+## Persistence
+
+Transport persists trucks and deliveries with PostgreSQL and Liquibase.
+
+| Aggregate | Repository port | Infrastructure adapter |
+|---|---|---|
+| `Truck` | `TruckRepository` | `TruckRepositoryAdapter` + `TruckJpaRepository` |
+| `Delivery` | `DeliveryRepository` | `DeliveryRepositoryAdapter` + `DeliveryJpaRepository` |
