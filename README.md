@@ -25,9 +25,7 @@ Distributed system that simulates a supply chain between factories, warehouses a
 
 ## Context Map
 
-![Context Map](context-map.drawio.svg)
-
-Editable source: [context-map.drawio.svg](context-map.drawio.svg). Open it with draw.io to review or export a PNG.
+![Context Map](context-map.png)
 
 ## Main flow - UC-05: Store orders 3 tables
 
