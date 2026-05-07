@@ -7,7 +7,7 @@ Distributed system that simulates a supply chain between factories, warehouses a
 | Area | Link |
 |---|---|
 | General repository | [PauLopNun/supply-chain-simulator-workshop](https://github.com/PauLopNun/supply-chain-simulator-workshop.git) |
-| Trello board | [Trello](trello) |
+| Trello board | [Trello](https://trello.com/invite/b/69f3150f7f2afba50da43e35/ATTI8b3ee9a1af9383894332da7d3528aec1F238389E/supply-chain-workshop-gft-2026) |
 | Simulation - Time + Map | [fraarrmat11/MS-SIMULATION](https://github.com/fraarrmat11/MS-SIMULATION) |
 | Factories / Production | [Fepe7/Factory-Workshop-Gft](https://github.com/Fepe7/Factory-Workshop-Gft) |
 | Warehouses | [Esmeralda6/Warehouse-Workshop](https://github.com/Esmeralda6/Warehouse-Workshop) |
