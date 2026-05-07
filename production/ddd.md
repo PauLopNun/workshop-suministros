@@ -113,6 +113,7 @@ classDiagram
         +WarehouseOrderId id
         +WarehouseId warehouseId
         +ProductId productId
+        +FactoryId factoryAssigned
         +int quantity
         +WarehouseOrderStatus status
         +complete()
@@ -151,6 +152,7 @@ classDiagram
     %% CROSS-AGGREGATE RELATIONSHIPS
     %% =======================
     Factory ..> RecipeId : assigns
+    WarehouseOrder ..> FactoryId : assigned to
     ProductionOrder ..> FactoryId : placed at
     ProductionOrder ..> RecipeId : uses
     ProductionOrder ..> WarehouseOrderId : fulfills
@@ -170,7 +172,9 @@ flowchart TD
     UC3([POST /warehouses/id/orders]) --> C1[PlaceWarehouseOrder]
     C1 --> C2[Asks for materials to Warehouse\nPublishes production.materials.requested.v1]
     UC4([GET /recipes]) --> D1[GetAllRecipes]
-    D1 --> D2[Gets all recipes so warehouses can see if the factory can produce what they need]
+    D1 --> D2[Gets all recipes]
+    UC5([GET /factories/productId]) --> E1[GetFactoryByProductProduced]
+    E1 --> E2[Requests the system to get all factories and filter which produces the product]
 ```
 
 ### Queues
