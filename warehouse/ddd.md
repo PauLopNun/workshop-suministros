@@ -142,12 +142,12 @@ classDiagram
  
 ```mermaid
 flowchart TD
-    START([MaterialsNeeded event received])
+    START([production.materials.requested.v1 received])
     Q1{Does the warehouse\nhave enough own stock?}
-    YES1[Publish StockAvailable\norderId + warehouseId → Factories]
-    NO1[Publish StockUnavailable\norderId → Reports\nOrder blocked — search other warehouses]
+    YES1[Reserve stock\npublish warehouse.materials.reserved.v1]
+    NO1[If no supplier can fulfill\npublish production.order.blocked.v1]
     Q2{Found another warehouse\nwith sufficient stock?}
-    YES2[Publish ShipmentRequested\nshipmentId + originId + destId + items + priority → Trucks]
+    YES2[Publish shipment.requested.v1\nshipmentId + origin + destination + items -> Transport]
     NO2[Fatal error\nNo warehouse producing stock\nOrder canceled]
     START --> Q1
     Q1 -->|YES| YES1
@@ -163,5 +163,5 @@ flowchart TD
 |---|---|
 | replenishment.requested.v1 | Production, Reporting |
 | warehouse.stock.changed.v1 | Production, Reporting |
-| dispatch.requested.v1 | Transport |
+| shipment.requested.v1 | Transport |
 | warehouse.registered.v1 | Time/Map |

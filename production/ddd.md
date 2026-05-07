@@ -213,8 +213,8 @@ flowchart TD
 
 ### Events Consumed
 
-| Event | Received by | Type |
+| Event | Source | Type |
 |---|---|---|
-| time.advanced.v1 | Time |  |
-| delivery.completed.v1 | Warehouse | boolean |
+| time.advanced.v1 | Simulation | TimeAdvanced |
+| delivery.completed.v1 | Transport | DeliveryCompleted |
 | replenishment.requested.v1 | Warehouse | ReplenishRequest |

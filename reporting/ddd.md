@@ -70,9 +70,8 @@ classDiagram
 |---|---|---|
 | time.advanced.v1 | Time | Saves to EventLog |
 | truck.registered.v1 | Transport | Saves to EventLog |
-| truck.assigned.v1 | Transport | Saves to EventLog, updates stats |
+| truck.status.changed.v1 | Transport | Saves to EventLog, updates stats |
 | truck.position.updated.v1 | Transport | Saves to EventLog |
-| delivery.created.v1 | Transport | Saves to EventLog |
 | delivery.completed.v1 | Transport | Saves to EventLog, updates stats |
 | production.order.created.v1 | Production | Saves to EventLog, updates history |
 | production.order.started.v1 | Production | Saves to EventLog, updates history |
