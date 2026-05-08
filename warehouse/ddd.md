@@ -160,23 +160,15 @@ classDiagram
 ## REST
 
 ```mermaid
-classDiagram
-    START1([POST/warehouses])
-    START2([GET/warehouses])
-    START3([GET/warehouses/{warehouseId}])
-    POST1[RegisterWarehouse]
-    GET1[GetAllWarehouses]
-    ID1[GetWarehouseByWarehouseId]
-    POST2[Creates and persists a Warehouse\Publishes\warehouse.registered.v1]
-    GET2[Gets All Warehouses]
-    ID2[Gets a Warehouse by his id]
-    START1 --> POST1
-    POST1 --> POST2
-    START2 --> GET1
-    GET1 --> GET2
-    START3 --> ID1
-    ID1 --> ID2
-    
+flowchart LR
+    P1([POST /warehouses]) --> UC1[RegisterWarehouse]
+    UC1 --> R1["Creates and persists a Warehouse\nPublishes warehouse.registered.v1"]
+
+    P2([GET /warehouses]) --> UC2[GetAllWarehouses]
+    UC2 --> R2[Gets all Warehouses]
+
+    P3(["GET /warehouses/{warehouseId}"]) --> UC3[GetWarehouseByWarehouseId]
+    UC3 --> R3[Gets a Warehouse by its id]
 ```
 
 ## Decision logic — production.materials.requested.v1
