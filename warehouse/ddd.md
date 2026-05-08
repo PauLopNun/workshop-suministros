@@ -1,26 +1,28 @@
 # Warehouses — Bounded Context (Core Domain)
- 
+
 ## Module: warehouse
- 
+
 ```mermaid
 classDiagram
     class Warehouse {
         <<aggregate root>>
         +WarehouseId id
         +String name
+        +Type warehouseType 
         +Location location
-        +Map minStockRules
-        +boolean isStockInfinite
+        +FactoryId id
         +checkOwnStock(items) boolean
-        +consumeStock(items) void
+        +consumeStock(items) List<stockItem>
         +receiveDelivery(items) void
-        +needsReplenishment() boolean
         +dispatchItems(items) void
     }
     class StockItem {
         <<entity>>
+        +StockItemID stockItemId
         +ProductId productId
         +Quantity quantity
+        +WarehouseId warehouseId
+        +Quantity minimumQuantityRule
         +isEnough(needed) boolean
         +add(qty) void
         +subtract(qty) void
@@ -28,7 +30,7 @@ classDiagram
     }
     class WarehouseId {
         <<value object>>
-        +String value
+        +UUID value
     }
     class Location {
         <<value object>>
@@ -41,17 +43,34 @@ classDiagram
     }
     class ProductId {
         <<value object>>
-        +String value
+        +UUID value
+    }
+    class StockItemId{
+        <<value object>>
+        +UUID id
+    }
+    class FactoryId {
+        <<value object>>
+        +UUID value
+    }
+    class Type {
+        <<enumeration>>
+        PRODUCTION
+        FACTORY
+        CLIENT
     }
     Warehouse "1" --> "1..*" StockItem
     Warehouse --> WarehouseId
     Warehouse --> Location
+    Warehouse --> FactoryId
+    Warehouse --> Type
     StockItem --> ProductId
     StockItem --> Quantity
+    StockItem --> StockItemId
 ```
- 
+
 ## Module: replenishment
- 
+
 ```mermaid
 classDiagram
     class Warehouse {
@@ -82,9 +101,9 @@ classDiagram
     Warehouse ..> SupplierWarehouseFinder
     SupplierWarehouseFinder --> ReplenishmentRequested
 ```
- 
+
 ## Module: services
- 
+
 ```mermaid
 classDiagram
     class Warehouse {
@@ -108,9 +127,9 @@ classDiagram
     Warehouse ..> ReplenishmentPolicy
     Warehouse ..> SupplierWarehouseFinder
 ```
- 
+
 ## Use cases (Application Layer)
- 
+
 ```mermaid
 classDiagram
     class RegisterWarehouse {
@@ -137,17 +156,39 @@ classDiagram
     ReceiveDelivery --> Warehouse
     DispatchShipment --> Warehouse
 ```
- 
+
+## REST
+
+```mermaid
+classDiagram
+    START1([POST/warehouses])
+    START2([GET/warehouses])
+    START3([GET/warehouses/{warehouseId}])
+    POST1[RegisterWarehouse]
+    GET1[GetAllWarehouses]
+    ID1[GetWarehouseByWarehouseId]
+    POST2[Creates and persists a Warehouse\Publishes\warehouse.registered.v1]
+    GET2[Gets All Warehouses]
+    ID2[Gets a Warehouse by his id]
+    START1 --> POST1
+    POST1 --> POST2
+    START2 --> GET1
+    GET1 --> GET2
+    START3 --> ID1
+    ID1 --> ID2
+    
+```
+
 ## Decision logic — production.materials.requested.v1
- 
+
 ```mermaid
 flowchart TD
-    START([production.materials.requested.v1 received])
+    START([MaterialsNeeded event received])
     Q1{Does the warehouse\nhave enough own stock?}
-    YES1[Reserve stock\npublish warehouse.materials.reserved.v1]
-    NO1[If no supplier can fulfill\npublish production.order.blocked.v1]
+    YES1[Publish StockAvailable\norderId + warehouseId → Factories]
+    NO1[Publish StockUnavailable\norderId → Reports\nOrder blocked — search other warehouses]
     Q2{Found another warehouse\nwith sufficient stock?}
-    YES2[Publish shipment.requested.v1\nshipmentId + origin + destination + items -> Transport]
+    YES2[Publish ShipmentRequested\nshipmentId + originId + destId + items + priority → Trucks]
     NO2[Fatal error\nNo warehouse producing stock\nOrder canceled]
     START --> Q1
     Q1 -->|YES| YES1
@@ -163,5 +204,5 @@ flowchart TD
 |---|---|
 | replenishment.requested.v1 | Production, Reporting |
 | warehouse.stock.changed.v1 | Production, Reporting |
-| shipment.requested.v1 | Transport |
+| dispatch.requested.v1 | Transport |
 | warehouse.registered.v1 | Time/Map |
