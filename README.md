@@ -96,7 +96,7 @@ Repository check summary:
 |---|---|---|---|
 | `fraarrmat11/MS-SIMULATION` | `POST /tick`, `GET /map` | Publishes `time.advanced.v1`; consumes `truck.registered.v1`, `truck.position.updated.v1`, `warehouse.registered.v1` | Publishes with routing key only; consumers use queues named like the events. |
 | `Fepe7/Factory-Workshop-Gft` | `POST /factories`, `GET /factories/{productId}`, `POST /recipes`, `GET /recipes`, `POST /warehouses/{warehouseId}/orders` | Publishes to `production.events`; consumes `production.time.advanced`, `production.delivery.completed`, `production.replenishment.requested` | Mentions `dispatch.requested.v1` in docs, but code does not publish it. |
-| `Esmeralda6/Warehouse-Workshop` | POST /warehouses, GET /warehouses/list, GET /warehouses/{warehouseId} | Publishes to `warehouse.events`; consumes `warehouse.time.advanced`, `delivery.completed`, ` | Current repo is domain-focused; infra contracts remain intended design. |
+| `Esmeralda6/Warehouse-Workshop` | `POST /warehouses`, `GET /warehouses/list`, `GET /warehouses/{warehouseId}` | Publishes to `warehouse.events`; consumes `warehouse.time.advanced`, `delivery.completed`, ` | Current repo is domain-focused; infra contracts remain intended design. |
 | `PauLopNun/transport-service` | `POST /trucks`, `GET /trucks` | Publishes truck/delivery events; configures `shipment.requested.v1` and `time.advanced.v1` consumers | `DispatchRequestedListener` is currently empty, so shipment consumption is not end-to-end yet. |
 
 ## Dependency Rule
