@@ -204,7 +204,8 @@ flowchart TD
 
 | Event | Consumed by | Type |
 |---|---|---|
-| recipe.registered.v1 | Reporting | Factory |
+| recipe.registered.v1 | Reporting | Recipe |
+| factory.registered.v1 | Reporting | Factory |
 | production.materials.requested.v1 | Warehouse | MaterialsRequested |
 | production.order.completed.v1 | Warehouse, Reporting | WarehouseOrder |
 | production.order.created.v1 | Reporting | ProductionOrder |
@@ -216,5 +217,4 @@ flowchart TD
 | Event | Source | Type |
 |---|---|---|
 | time.advanced.v1 | Simulation | TimeAdvanced |
-| delivery.completed.v1 | Transport | DeliveryCompleted |
 | replenishment.requested.v1 | Warehouse | ReplenishRequest |
