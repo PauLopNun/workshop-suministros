@@ -184,9 +184,9 @@ flowchart TD
     E1 --> E2[Decrements remainingDays for each IN_PROGRESS order]
     E2 --> E3{remainingDays == 0?}
     E3 -->|YES| E4[Publishes production.order.completed.v1]
-    UC6([delivery.completed.v1 received]) --> F1[HandleMaterialsArrived]
-    F1 --> F2[Publishes production.order.started.v1]
-    UC7([replenishment.requested.v1 received]) --> G1[CheckIfProductionCanStart]
+    UC7([materials.given.v1 received]) --> G1[CheckIfProductionCanStart]
+    G1 --> G2{can start production?}
+    G2 --> |YES| G3[Start production\nPublish production.order.started.v1]
 ```
 
 ## Use case
@@ -217,4 +217,109 @@ flowchart TD
 | Event | Source | Type |
 |---|---|---|
 | time.advanced.v1 | Simulation | TimeAdvanced |
-| replenishment.requested.v1 | Warehouse | ReplenishRequest |
+| materials.given.v1 | Warehouse | MaterialsRequested |
+
+## Types sent or received by events
+### Received -> materials.given.v1 (Warehouse)
+```json
+{
+    "items": [
+        {
+            "productId": "UUID",
+            "quantity": "int"
+        },
+        {
+            "productId": "UUID",
+            "quantity": "int"
+        },
+    ]
+}
+```
+
+### Received -> time.advanced.v1 (Time)
+```json
+{
+    "eventId": "UUID",
+    "previousDay": "int",
+    "currentDay": "int",
+    "daysAdvanced": "int",
+    "occuredAt": "Instant"
+}
+```
+
+### Sent -> recipe.registered.v1 (Reporting)
+```json
+{
+    "recipeId": "UUID",
+    "name": "String",
+    "inputs": [
+        {
+            "productId": "UUID",
+            "quantity": "int"
+        },
+        {
+            "productId": "UUID",
+            "quantity": "int"
+        },
+    ],
+    "outputProudctId": "UUID",
+    "buildTimeInDays": "int"
+}
+```
+
+### Sent -> factory.registered.v1 (Reporting)
+```json
+{
+    "factoryId": "UUID",
+    "name": "String",
+    "locationX": "int",
+    "locationY": "int",
+    "warehouseId": "UUID",
+    "assignedRecipeIds": [
+        "productId",
+        "productId",
+    ]
+}
+```
+
+### Sent -> production.materials.requested.v1 (Reporting)
+```json
+{
+    "items": [
+        {
+            "productId": "UUID",
+            "quantity": "int"
+        },
+        {
+            "productId": "UUID",
+            "quantity": "int"
+        },
+    ],
+}
+```
+
+### Sent -> production.order.registered.v1 (Reporting)
+```json
+{
+    "warehouseOrderId": "UUID",
+    "productionOrderId": "UUID",
+    "warehouseId": "UUID",
+    "productId": "UUID",
+    "quantity": "int",
+    "factoryAssigned": "UUID",
+    "quantity": "int",
+    "status": "Enum (PENDING, IN_PROGRESS, COMPLETED)"
+}
+```
+
+### Sent -> production.order.completed.v1 / production.order.started.v1 / production.order.blocked.v1 (Reporting)
+```json
+{
+    "orderId": "UUID",
+    "factoryId": "UUID",
+    "recipeId": "UUID",
+    "warehouseOrderId": "UUID",
+    "status": "Enum (PENDING, IN_PROGRESS, COMPLETED)",
+    "remainingDays": "int"
+}
+```
