@@ -12,6 +12,8 @@ Distributed system that simulates a supply chain between factories, warehouses a
 | Factories / Production | [Fepe7/Factory-Workshop-Gft](https://github.com/Fepe7/Factory-Workshop-Gft) |
 | Warehouses | [Esmeralda6/Warehouse-Workshop](https://github.com/Esmeralda6/Warehouse-Workshop) |
 | Trucks / Transport | [PauLopNun/transport-service](https://github.com/PauLopNun/transport-service) |
+| Reporting | [josephPol/reports-workshop-Gft](https://github.com/josephPol/reports-workshop-Gft.git) |
+
 
 ## Teams
 
